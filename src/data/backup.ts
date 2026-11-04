@@ -1,16 +1,16 @@
-import { isValidDate } from '../domain/dates';
-import { getSettings, syncRecurring, updateSettings } from './repo';
-import { db } from './db';
+import { isValidDate, todayISO } from '../domain/dates';
+import { migrateLegacy, stripLegacy, type LegacyRule, type LegacyTransaction } from '../domain/legacy';
+import { getSettings, syncSalary, updateSettings } from './repo';
+import { db, newId } from './db';
 
 const APP = 'pocket';
-const VERSION = 1;
+const VERSION = 2;
 
 export async function buildBackup() {
   const exportedAt = new Date().toISOString();
-  const [transactions, categories, recurring, budgets, settings] = await Promise.all([
+  const [transactions, categories, budgets, settings] = await Promise.all([
     db.transactions.toArray(),
     db.categories.toArray(),
-    db.recurring.toArray(),
     db.budgets.toArray(),
     getSettings(),
   ]);
@@ -18,7 +18,7 @@ export async function buildBackup() {
     app: APP,
     version: VERSION,
     exportedAt,
-    data: { transactions, categories, recurring, budgets, settings },
+    data: { transactions, categories, budgets, settings },
   };
 }
 
@@ -33,7 +33,7 @@ export function validateBackup(raw: unknown) {
     throw new Error('This file is not a Pocket backup.');
   }
   if (raw.version > VERSION) throw new Error('This backup is from a newer version of Pocket.');
-  const { transactions, categories, recurring, budgets, settings } = raw.data;
+  const { transactions, categories, recurring = [], budgets, settings } = raw.data;
   const ok =
     Array.isArray(transactions) &&
     transactions.every(
@@ -54,23 +54,30 @@ export function validateBackup(raw: unknown) {
     isText(settings.currency) &&
     isCents(settings.openingBalanceCents);
   if (!ok) throw new Error('This backup is damaged, so nothing was changed.');
-  return raw.data as Awaited<ReturnType<typeof buildBackup>>['data'];
+  return { ...raw.data, recurring } as Awaited<ReturnType<typeof buildBackup>>['data'] & {
+    recurring: LegacyRule[];
+  };
 }
 
-/** Replaces everything in the app with the backup, all or nothing. */
-export async function restoreBackup(raw: unknown) {
+/** Replaces everything in the app with the backup, all or nothing. Old backups are upgraded. */
+export async function restoreBackup(raw: unknown, today = todayISO()) {
   const data = validateBackup(raw);
-  await db.transaction('rw', [db.transactions, db.categories, db.recurring, db.budgets, db.settings], async () => {
+  const old = migrateLegacy(data.recurring, data.transactions as LegacyTransaction[], today, newId);
+  const transactions = [...data.transactions.map(stripLegacy), ...old.added];
+  const settings = {
+    ...data.settings,
+    ...(old.salary ? { salary: old.salary } : {}),
+    ...(old.retired.length ? { retiredRecurring: old.retired } : {}),
+  };
+  await db.transaction('rw', [db.transactions, db.categories, db.budgets, db.settings], async () => {
     await Promise.all([
-      db.transactions.clear(), db.categories.clear(), db.recurring.clear(),
-      db.budgets.clear(), db.settings.clear(),
+      db.transactions.clear(), db.categories.clear(), db.budgets.clear(), db.settings.clear(),
     ]);
-    await db.transactions.bulkAdd(data.transactions);
+    await db.transactions.bulkAdd(transactions);
     await db.categories.bulkAdd(data.categories);
-    await db.recurring.bulkAdd(data.recurring);
     await db.budgets.bulkAdd(data.budgets);
-    await updateSettings(data.settings);
+    await updateSettings(settings);
   });
-  await syncRecurring();
-  return data.transactions.length;
+  await syncSalary(today);
+  return transactions.length;
 }

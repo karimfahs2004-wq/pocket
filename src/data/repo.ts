@@ -1,13 +1,11 @@
-import { addDays, todayISO } from '../domain/dates';
-import { firstOnOrAfter, occurrencesThrough } from '../domain/recurring';
+import { addMonthKey, monthOf, todayISO } from '../domain/dates';
+import { monthsDue, paydayIn } from '../domain/salary';
 import {
   DEFAULT_SETTINGS,
   type Budget,
   type Category,
-  type RecurringRule,
   type Settings,
   type Transaction,
-  type TxType,
 } from '../domain/types';
 import { db, newId } from './db';
 
@@ -19,75 +17,47 @@ export async function saveTransaction(tx: Omit<Transaction, 'id'> & { id?: strin
 export const deleteTransaction = (id: string) => db.transactions.delete(id);
 export const restoreTransaction = (tx: Transaction) => db.transactions.put(tx);
 
-// --- Recurring
+// --- Salary
 
-/** Creates any transactions that have fallen due. Safe to run as often as you like. */
-export async function syncRecurring(today = todayISO()): Promise<number> {
+/**
+ * Adds salary as income once its payday arrives, so expected pay never counts as money
+ * received. Safe to run as often as you like, and it catches up after time away.
+ */
+export async function syncSalary(today = todayISO()): Promise<number> {
   let created = 0;
-  await db.transaction('rw', db.recurring, db.transactions, async () => {
-    for (const rule of await db.recurring.toArray()) {
-      if (rule.paused || rule.nextDue > today) continue;
-      for (const date of occurrencesThrough(rule, today)) {
-        // The check stops a duplicate if two tabs sync at once or a schedule is edited.
-        const exists = await db.transactions
-          .where('[recurringId+occurrenceDate]')
-          .equals([rule.id, date])
-          .count();
-        if (exists) continue;
-        await db.transactions.add({
-          id: newId(),
-          type: rule.type,
-          name: rule.name,
-          amountCents: rule.amountCents,
-          categoryId: rule.categoryId,
-          date,
-          notes: rule.notes,
-          recurringId: rule.id,
-          occurrenceDate: date,
-        });
-        created++;
-      }
-      const next = firstOnOrAfter(rule.startDate, rule.frequency, addDays(today, 1));
-      await db.recurring.update(rule.id, { nextDue: next });
+  await db.transaction('rw', db.settings, db.transactions, async () => {
+    const salary = (await db.settings.get('salary'))?.value as Settings['salary'];
+    if (!salary) return;
+    const due = monthsDue(salary, today);
+    if (!due.length) return;
+    for (const month of due) {
+      // A salary you entered yourself for this month counts, so it isn't added twice.
+      const exists = await db.transactions
+        .where('date').between(`${month}-01`, `${month}-31`, true, true)
+        .filter((t) => t.type === 'income' && t.categoryId === 'salary')
+        .count();
+      if (exists) continue;
+      await db.transactions.add({
+        id: newId(), type: 'income', name: 'Salary', amountCents: salary.amountCents,
+        categoryId: 'salary', date: paydayIn(month, salary.payDay),
+      });
+      created++;
     }
+    await db.settings.put({ key: 'salary', value: { ...salary, lastPaidMonth: due[due.length - 1] } });
   });
   return created;
 }
 
-export type RecurringInput = Omit<RecurringRule, 'id' | 'nextDue' | 'paused'>;
-
-/** New rules catch up from their start date. Edits only change what happens from now on. */
-export async function saveRecurring(input: RecurringInput, id?: string, today = todayISO()) {
-  const existing = id ? await db.recurring.get(id) : undefined;
-  if (existing) {
-    const scheduleChanged =
-      existing.startDate !== input.startDate || existing.frequency !== input.frequency;
-    await db.recurring.put({
-      ...existing,
-      ...input,
-      nextDue: scheduleChanged
-        ? firstOnOrAfter(input.startDate, input.frequency, today)
-        : existing.nextDue,
-    });
-  } else {
-    await db.recurring.add({ ...input, id: newId(), nextDue: input.startDate, paused: false });
-  }
-  await syncRecurring(today);
+/** A change applies from the next payday. Salary already received stays as it was. */
+export async function saveSalary(amountCents: number, payDay: number, today = todayISO()) {
+  const current = (await getSettings()).salary;
+  const lastPaidMonth = current?.lastPaidMonth ?? addMonthKey(monthOf(today), -1);
+  await db.settings.put({ key: 'salary', value: { amountCents, payDay, lastPaidMonth } });
+  await syncSalary(today);
 }
 
-/** Resuming skips anything missed while paused, so old bills don't appear all at once. */
-export async function setRecurringPaused(id: string, paused: boolean, today = todayISO()) {
-  const rule = await db.recurring.get(id);
-  if (!rule) return;
-  await db.recurring.update(id, {
-    paused,
-    ...(paused ? {} : { nextDue: firstOnOrAfter(rule.startDate, rule.frequency, today) }),
-  });
-  if (!paused) await syncRecurring(today);
-}
-
-/** Past transactions stay in your history; only future ones stop. */
-export const deleteRecurring = (id: string) => db.recurring.delete(id);
+/** Stops future salary. Past salary stays in your history. */
+export const removeSalary = () => db.settings.delete('salary');
 
 // --- Budgets
 
@@ -96,24 +66,33 @@ export const removeBudget = (id: string) => db.budgets.delete(id);
 
 // --- Categories
 
-export async function addCategory(name: string, kind: TxType, colorSlot: number) {
-  const id = newId();
-  await db.categories.add({ id, name: name.trim(), kind, colorSlot });
-  return id;
+/** Reuses a category with the same name, so a quick add can't create duplicates. */
+export async function addCategory(name: string, colorSlot?: number): Promise<string> {
+  const clean = name.trim();
+  return db.transaction('rw', db.categories, async () => {
+    const all = (await db.categories.toArray()).filter((c) => c.kind === 'expense');
+    const same = all.find((c) => c.name.toLowerCase() === clean.toLowerCase());
+    if (same) {
+      if (same.archived) await db.categories.update(same.id, { archived: false });
+      return same.id;
+    }
+    const active = all.filter((c) => !c.archived);
+    const used = (slot: number) => active.filter((c) => c.colorSlot === slot).length;
+    const slot = colorSlot ?? [0, 1, 2, 3, 4, 5, 6, 7].sort((a, b) => used(a) - used(b))[0];
+    const id = newId();
+    await db.categories.add({ id, name: clean, kind: 'expense', colorSlot: slot });
+    return id;
+  });
 }
 
 export const updateCategory = (id: string, changes: Partial<Pick<Category, 'name' | 'colorSlot'>>) =>
   db.categories.update(id, changes);
 
-export type RemoveResult = 'deleted' | 'archived' | 'blocked';
+export type RemoveResult = 'deleted' | 'archived';
 
-/**
- * A category used by past transactions is archived so your history stays correct.
- * A category used by a recurring payment must be changed there first.
- */
+/** A category used by past expenses is archived so your history stays correct. */
 export async function removeCategory(id: string): Promise<RemoveResult> {
-  return db.transaction('rw', db.categories, db.transactions, db.recurring, db.budgets, async () => {
-    if ((await db.recurring.filter((r) => r.categoryId === id).count()) > 0) return 'blocked';
+  return db.transaction('rw', db.categories, db.transactions, db.budgets, async () => {
     await db.budgets.delete(id);
     if ((await db.transactions.where('categoryId').equals(id).count()) > 0) {
       await db.categories.update(id, { archived: true });

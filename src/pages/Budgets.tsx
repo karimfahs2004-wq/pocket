@@ -1,11 +1,10 @@
 import { Plus } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { AmountField } from '../components/AmountField';
-import { Dot, Empty, LevelBadge, Meter, MonthPicker, PageHead, Sheet } from '../components/ui';
+import { Dot, Empty, LevelBadge, Meter, MonthPicker, Sheet, useUi } from '../components/ui';
 import { useAppData } from '../data/hooks';
 import { removeBudget, setBudget } from '../data/repo';
 import { budgetStatus, type BudgetStatus } from '../domain/budget';
-import { monthOf, todayISO } from '../domain/dates';
 import { centsToInput, parseAmount } from '../domain/money';
 import { monthTotals, spendByCategory } from '../domain/reports';
 import { OVERALL_BUDGET_ID } from '../domain/types';
@@ -49,7 +48,7 @@ function BudgetSheet({ id, title, current, categories, onClose }: {
 
 export default function Budgets() {
   const d = useAppData();
-  const [month, setMonth] = useState(monthOf(todayISO()));
+  const { month } = useUi();
   const [editing, setEditing] = useState<{ id?: string; title: string; current?: number; pick?: boolean } | null>(null);
   if (!d.ready) return null;
 
@@ -64,17 +63,16 @@ export default function Budgets() {
   const Summary = ({ s }: { s: BudgetStatus }) => (
     <>
       <Meter ratio={s.ratio} level={s.level} />
-      <p className="muted small">
-        <span className="num">{d.money(s.spentCents)}</span> of <span className="num">{d.money(s.limitCents)}</span>,{' '}
-        {s.remainingCents >= 0 ? `${d.money(s.remainingCents)} left` : `${d.money(-s.remainingCents)} over`}
-      </p>
+      <span className="budget-nums small">
+        <span className="muted">{Math.round(s.ratio * 100)}% used, {d.money(s.spentCents)} of {d.money(s.limitCents)}</span>
+        <strong className="num">{s.remainingCents >= 0 ? `${d.money(s.remainingCents)} left` : `${d.money(-s.remainingCents)} over`}</strong>
+      </span>
     </>
   );
 
   return (
     <div className="stack">
-      <PageHead title="Budget" />
-      <MonthPicker month={month} onChange={setMonth} />
+      <MonthPicker />
 
       {overall ? (
         <button className="panel budget" onClick={() => setEditing({ id: OVERALL_BUDGET_ID, title: 'Monthly budget', current: overall.amountCents })}>

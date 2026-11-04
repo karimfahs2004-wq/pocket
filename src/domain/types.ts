@@ -1,7 +1,6 @@
 export type ISODate = string; // 'YYYY-MM-DD', always a local calendar date
 export type MonthKey = string; // 'YYYY-MM'
 export type TxType = 'income' | 'expense';
-export type Frequency = 'weekly' | 'monthly' | 'yearly';
 
 export interface Transaction {
   id: string;
@@ -12,8 +11,6 @@ export interface Transaction {
   categoryId: string;
   date: ISODate;
   notes?: string;
-  recurringId?: string;
-  occurrenceDate?: ISODate;
 }
 
 export interface Category {
@@ -25,18 +22,13 @@ export interface Category {
   archived?: boolean;
 }
 
-export interface RecurringRule {
-  id: string;
-  type: TxType;
-  name: string;
+/** Salary that's added as income on payday each month. */
+export interface Salary {
   amountCents: number;
-  categoryId: string;
-  frequency: Frequency;
-  startDate: ISODate;
-  /** The next date a transaction should be generated for. */
-  nextDue: ISODate;
-  paused: boolean;
-  notes?: string;
+  /** Day of the month, 1-31. Short months use their last day. */
+  payDay: number;
+  /** The latest month that has been handled, so a deleted payment doesn't come back. */
+  lastPaidMonth: MonthKey;
 }
 
 export const OVERALL_BUDGET_ID = 'overall';
@@ -51,6 +43,9 @@ export interface Settings {
   currency: string;
   openingBalanceCents: number;
   lastBackupAt?: string;
+  salary?: Salary;
+  /** Old recurring payments, kept for reference after that feature was removed. */
+  retiredRecurring?: unknown[];
 }
 
 export const DEFAULT_SETTINGS: Settings = { currency: 'USD', openingBalanceCents: 0 };

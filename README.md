@@ -1,6 +1,6 @@
 # Pocket
 
-A personal finance tracker for one person: salary, expenses, recurring payments, budgets and reports.
+A personal finance tracker for one person: salary, expenses, budgets and reports.
 It installs on your phone from the browser, works offline and costs nothing to host.
 
 Your data stays in your browser's database on your device. It is never sent to a server.
@@ -16,24 +16,11 @@ npm test         # runs the automated tests
 npm run build    # creates the production version in dist/
 ```
 
-## Put it online for free (Cloudflare Pages)
+## Publish a change
 
-1. Create a free account at [cloudflare.com](https://dash.cloudflare.com/sign-up).
-2. In this folder, run:
-
-   ```bash
-   npm install
-   npm run build
-   npx wrangler login
-   npx wrangler pages deploy dist --project-name pocket-karim
-   ```
-
-   If the name is taken, pick another. If asked about a production branch, accept the default.
-3. Wrangler prints your address, such as `https://pocket-karim.pages.dev`.
-
-To publish a later change, run the `build` and `deploy` commands again. Your data is not affected.
-
-Anyone with the link can open the app, but they get their own empty copy. They can't see your data.
+The app is hosted on GitHub Pages at https://karimfahs2004-wq.github.io/pocket/ from the `gh-pages` branch.
+Build with `BASE_PATH=/pocket/ npm run build`, copy `dist/index.html` to `dist/404.html`, and put the contents of `dist/` on that branch.
+Your data is not affected.
 
 ## Install it on your phone
 
@@ -52,8 +39,7 @@ including on a new phone. Keep using the same web address, because each address 
 
 ## How it behaves
 
-- **Recurring payments** are added when you open the app on or after the due date, including any missed while it was closed.
-- **Paused payments** skip the paused period when resumed. Deleting a recurring payment keeps its past transactions.
+- **Salary** is set once on the Income page (tap Income on Home) and added on payday each month. Until payday it's shown as expected and isn't counted. Changing it applies from the next payday, so past months stay accurate.
 - **Overall balance** is your starting balance plus income minus expenses, dated today or earlier.
 - **Budget warnings** appear at 80% of a limit and when you go over it.
 - **Currency** is one setting that changes the symbol. It doesn't convert amounts.
@@ -62,7 +48,7 @@ including on a new phone. Keep using the same web address, because each address 
 
 ```
 src/
-  domain/      Pure logic, no UI or database: money, dates, recurring, budgets, reports
+  domain/      Pure logic, no UI or database: money, dates, salary, budgets, reports, old data upgrades
   data/        Database schema (db.ts), reads and writes (repo.ts), backup, live hook
   components/  Shared UI: forms, sheets, month strip
   pages/       One file per screen

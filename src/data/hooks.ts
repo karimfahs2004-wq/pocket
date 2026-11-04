@@ -11,21 +11,19 @@ export function useAppData() {
   const categories = useLiveQuery(async () =>
     (await db.categories.toArray()).sort((a, b) => a.name.localeCompare(b.name)),
   );
-  const recurring = useLiveQuery(() => db.recurring.toArray());
   const budgets = useLiveQuery(() => db.budgets.toArray());
   const settings = useLiveQuery(getSettings);
 
   return useMemo(() => {
     const cur = settings ?? DEFAULT_SETTINGS;
     return {
-      ready: !!(transactions && categories && recurring && budgets && settings),
+      ready: !!(transactions && categories && budgets && settings),
       transactions: transactions ?? [],
       categories: categories ?? [],
       categoryById: new Map((categories ?? []).map((c) => [c.id, c])),
-      recurring: recurring ?? [],
       budgets: budgets ?? [],
       settings: cur,
       money: (cents: number) => formatMoney(cents, cur.currency),
     };
-  }, [transactions, categories, recurring, budgets, settings]);
+  }, [transactions, categories, budgets, settings]);
 }

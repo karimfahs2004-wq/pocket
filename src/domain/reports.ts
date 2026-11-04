@@ -43,22 +43,13 @@ export function currentBalance(txs: Transaction[], openingCents: number, today: 
   }, openingCents);
 }
 
-export interface ComparisonRow {
-  categoryId: string;
-  aCents: number;
-  bCents: number;
-  diffCents: number;
-}
-
-/** Spending per category in month `a` vs month `b`; diff is a minus b. Largest change first. */
-export function compareMonths(txs: Transaction[], a: MonthKey, b: MonthKey): ComparisonRow[] {
-  const sa = spendByCategory(txs, a);
-  const sb = spendByCategory(txs, b);
-  return [...new Set([...sa.keys(), ...sb.keys()])]
-    .map((categoryId) => {
-      const aCents = sa.get(categoryId) ?? 0;
-      const bCents = sb.get(categoryId) ?? 0;
-      return { categoryId, aCents, bCents, diffCents: aCents - bCents };
-    })
-    .sort((x, y) => Math.abs(y.diffCents) - Math.abs(x.diffCents));
+/** Average across months with expenses, up to and including `upTo`. */
+export function averageMonthlySpend(txs: Transaction[], upTo: MonthKey): { cents: number; months: number } {
+  const byMonth = new Map<MonthKey, number>();
+  for (const x of txs) {
+    const m = monthOf(x.date);
+    if (x.type === 'expense' && m <= upTo) byMonth.set(m, (byMonth.get(m) ?? 0) + x.amountCents);
+  }
+  const total = [...byMonth.values()].reduce((a, b) => a + b, 0);
+  return { cents: byMonth.size ? Math.round(total / byMonth.size) : 0, months: byMonth.size };
 }

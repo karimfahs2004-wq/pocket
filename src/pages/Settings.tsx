@@ -2,17 +2,17 @@ import { ArrowLeft, Download, Pencil, Plus, Trash2, Upload } from 'lucide-react'
 import { useRef, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { AmountField } from '../components/AmountField';
-import { Dot, Segmented, Sheet, useUi } from '../components/ui';
+import { Dot, Sheet, useUi } from '../components/ui';
 import { buildBackup, restoreBackup } from '../data/backup';
 import { useAppData } from '../data/hooks';
 import { addCategory, removeCategory, updateCategory, updateSettings } from '../data/repo';
 import { centsToInput, parseAmount } from '../domain/money';
 import { todayISO } from '../domain/dates';
-import type { Category, TxType } from '../domain/types';
+import type { Category } from '../domain/types';
 
 const CURRENCIES = ['USD', 'LBP', 'EUR', 'GBP', 'AED', 'SAR'];
 
-function CategorySheet({ category, kind, onClose }: { category?: Category; kind: TxType; onClose: () => void }) {
+function CategorySheet({ category, onClose }: { category?: Category; onClose: () => void }) {
   const [name, setName] = useState(category?.name ?? '');
   const [slot, setSlot] = useState(category?.colorSlot ?? 0);
   const [error, setError] = useState('');
@@ -20,7 +20,7 @@ function CategorySheet({ category, kind, onClose }: { category?: Category; kind:
     e.preventDefault();
     if (!name.trim()) return setError('Enter a category name.');
     if (category) await updateCategory(category.id, { name: name.trim(), colorSlot: slot });
-    else await addCategory(name, kind, slot);
+    else await addCategory(name, slot);
     onClose();
   };
   return (
@@ -48,7 +48,6 @@ function CategorySheet({ category, kind, onClose }: { category?: Category; kind:
 export default function Settings() {
   const d = useAppData();
   const { confirm, toast } = useUi();
-  const [kind, setKind] = useState<TxType>('expense');
   const [sheet, setSheet] = useState<{ category?: Category } | null>(null);
   const [opening, setOpening] = useState<string | null>(null);
   const [openingError, setOpeningError] = useState('');
@@ -117,19 +116,15 @@ export default function Settings() {
   const remove = async (c: Category) => {
     const yes = await confirm({
       title: `Delete ${c.name}?`,
-      body: 'If past transactions use it, they keep it, but you can no longer choose it for new ones.',
+      body: 'Past expenses keep this category, but you can no longer choose it for new ones.',
       action: 'Delete',
     });
     if (!yes) return;
-    const result = await removeCategory(c.id);
-    toast({
-      message: result === 'blocked'
-        ? `A recurring payment uses ${c.name}. Change that payment first.`
-        : `${c.name} deleted`,
-    });
+    await removeCategory(c.id);
+    toast({ message: `${c.name} deleted` });
   };
 
-  const list = d.categories.filter((c) => c.kind === kind && !c.archived);
+  const list = d.categories.filter((c) => c.kind === 'expense' && !c.archived);
   const backupDate = d.settings.lastBackupAt && new Date(d.settings.lastBackupAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
   return (
@@ -145,7 +140,7 @@ export default function Settings() {
         <h2>Money</h2>
         <form onSubmit={saveOpening} className="form" noValidate>
           <AmountField label="Starting balance" allowNegative value={openingValue} onChange={setOpening} error={openingError} />
-          <p className="hint">What you had before you started using Pocket. Your overall balance builds on this.</p>
+          <p className="hint">What you had before you started using Pocket. Your overall balance starts from this, then adds income and subtracts expenses.</p>
           {opening !== null && <button className="btn primary">Save starting balance</button>}
         </form>
         <div className="field">
@@ -159,12 +154,9 @@ export default function Settings() {
 
       <section className="panel form">
         <div className="panel-head">
-          <h2>Categories</h2>
+          <h2>Expense categories</h2>
           <button className="btn small" onClick={() => setSheet({})}><Plus size={15} aria-hidden />Add</button>
         </div>
-        <Segmented label="Category type" value={kind} onChange={setKind} options={[
-          { value: 'expense', label: 'Expense' }, { value: 'income', label: 'Income' },
-        ]} />
         <ul className="plain-list">
           {list.map((c) => (
             <li key={c.id} className="line">
@@ -188,7 +180,7 @@ export default function Settings() {
         </div>
       </section>
 
-      {sheet && <CategorySheet category={sheet.category} kind={kind} onClose={() => setSheet(null)} />}
+      {sheet && <CategorySheet category={sheet.category} onClose={() => setSheet(null)} />}
     </div>
   );
 }

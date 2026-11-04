@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ChevronLeft, ChevronRight, CircleAlert, TriangleAlert, X } from 'lucide-react';
-import { addMonthKey, formatMonth } from '../domain/dates';
+import { addMonthKey, formatMonth, monthOf, todayISO } from '../domain/dates';
 import type { Transaction, TxType } from '../domain/types';
 import type { BudgetLevel } from '../domain/budget';
 import { TransactionForm } from './TransactionForm';
@@ -37,6 +37,8 @@ export function Sheet({ title, onClose, children }: { title: string; onClose: ()
 interface ConfirmOptions { title: string; body: string; action: string }
 interface ToastOptions { message: string; undo?: () => void }
 interface Ui {
+  month: string;
+  setMonth: (m: string) => void;
   newTransaction: (type?: TxType) => void;
   editTransaction: (tx: Transaction) => void;
   confirm: (o: ConfirmOptions) => Promise<boolean>;
@@ -46,7 +48,13 @@ interface Ui {
 const UiContext = createContext<Ui | null>(null);
 export const useUi = () => useContext(UiContext)!;
 
+const sheetTitle = (f: { tx?: Transaction; type?: TxType }) => {
+  const income = (f.tx?.type ?? f.type) === 'income';
+  return `${f.tx ? 'Edit' : 'Add'} ${income ? 'income' : 'expense'}`;
+};
+
 export function UiProvider({ children }: { children: ReactNode }) {
+  const [month, setMonth] = useState(monthOf(todayISO()));
   const [form, setForm] = useState<{ tx?: Transaction; type?: TxType; key: number } | null>(null);
   const [ask, setAsk] = useState<(ConfirmOptions & { resolve: (v: boolean) => void }) | null>(null);
   const [note, setNote] = useState<ToastOptions | null>(null);
@@ -59,11 +67,13 @@ export function UiProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const ui = useMemo<Ui>(() => ({
+    month,
+    setMonth,
     newTransaction: (type) => setForm({ type, key: Date.now() }),
     editTransaction: (tx) => setForm({ tx, key: Date.now() }),
     confirm: (o) => new Promise((resolve) => setAsk({ ...o, resolve })),
     toast,
-  }), [toast]);
+  }), [toast, month]);
 
   const answer = (v: boolean) => { ask?.resolve(v); setAsk(null); };
 
@@ -71,7 +81,7 @@ export function UiProvider({ children }: { children: ReactNode }) {
     <UiContext.Provider value={ui}>
       {children}
       {form && (
-        <Sheet key={form.key} title={form.tx ? 'Edit transaction' : 'Add transaction'} onClose={() => setForm(null)}>
+        <Sheet key={form.key} title={sheetTitle(form)} onClose={() => setForm(null)}>
           <TransactionForm tx={form.tx} initialType={form.type} onDone={() => setForm(null)} />
         </Sheet>
       )}
@@ -98,35 +108,19 @@ export function UiProvider({ children }: { children: ReactNode }) {
 
 // --- Small shared pieces
 
-export function PageHead({ title, action }: { title: string; action?: ReactNode }) {
+/** The chosen month is shared, so it stays the same as you move between tabs. */
+export function MonthPicker({ action }: { action?: ReactNode }) {
+  const { month, setMonth } = useUi();
+  const current = monthOf(todayISO());
   return (
-    <header className="page-head">
-      <h1>{title}</h1>
+    <div className="month-bar">
+      <div className="month-picker">
+        <button className="icon-btn" onClick={() => setMonth(addMonthKey(month, -1))} aria-label="Previous month"><ChevronLeft size={22} aria-hidden /></button>
+        <h1 aria-live="polite">{formatMonth(month)}</h1>
+        <button className="icon-btn" onClick={() => setMonth(addMonthKey(month, 1))} aria-label="Next month"><ChevronRight size={22} aria-hidden /></button>
+      </div>
+      {month !== current && <button className="link small" onClick={() => setMonth(current)}>This month</button>}
       {action}
-    </header>
-  );
-}
-
-export function MonthPicker({ month, onChange }: { month: string; onChange: (m: string) => void }) {
-  return (
-    <div className="month-picker">
-      <button className="icon-btn" onClick={() => onChange(addMonthKey(month, -1))} aria-label="Previous month"><ChevronLeft size={22} aria-hidden /></button>
-      <strong aria-live="polite">{formatMonth(month)}</strong>
-      <button className="icon-btn" onClick={() => onChange(addMonthKey(month, 1))} aria-label="Next month"><ChevronRight size={22} aria-hidden /></button>
-    </div>
-  );
-}
-
-export function Segmented<T extends string>({ value, options, onChange, label }: {
-  value: T; options: { value: T; label: string }[]; onChange: (v: T) => void; label: string;
-}) {
-  return (
-    <div className="segmented" role="group" aria-label={label}>
-      {options.map((o) => (
-        <button type="button" key={o.value} aria-pressed={o.value === value} onClick={() => onChange(o.value)}>
-          {o.label}
-        </button>
-      ))}
     </div>
   );
 }

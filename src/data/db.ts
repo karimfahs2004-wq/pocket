@@ -1,5 +1,7 @@
 import Dexie, { type EntityTable } from 'dexie';
-import type { Budget, Category, RecurringRule, Transaction } from '../domain/types';
+import { todayISO } from '../domain/dates';
+import { migrateLegacy, type LegacyRule, type LegacyTransaction } from '../domain/legacy';
+import type { Budget, Category, Transaction } from '../domain/types';
 
 export interface SettingRow {
   key: string;
@@ -26,12 +28,10 @@ export const DEFAULT_CATEGORIES: Category[] = [
 export const db = new Dexie('pocket') as Dexie & {
   transactions: EntityTable<Transaction, 'id'>;
   categories: EntityTable<Category, 'id'>;
-  recurring: EntityTable<RecurringRule, 'id'>;
   budgets: EntityTable<Budget, 'id'>;
   settings: EntityTable<SettingRow, 'key'>;
 };
 
-// To change the schema later, add db.version(2).stores({...}) below this one.
 db.version(1).stores({
   transactions: 'id, date, categoryId, [recurringId+occurrenceDate]',
   categories: 'id',
@@ -39,6 +39,23 @@ db.version(1).stores({
   budgets: 'id',
   settings: 'key',
 });
+
+// Version 2 removes recurring payments. Every transaction is kept, and a monthly
+// salary rule becomes the new salary setting. Add db.version(3) for future changes.
+db.version(2)
+  .stores({ transactions: 'id, date, categoryId', recurring: null })
+  .upgrade(async (tx) => {
+    const rules: LegacyRule[] = await tx.table('recurring').toArray();
+    const txs: LegacyTransaction[] = await tx.table('transactions').toArray();
+    const { added, salary, retired } = migrateLegacy(rules, txs, todayISO(), newId);
+    await tx.table('transactions').bulkAdd(added);
+    await tx.table('transactions').toCollection().modify((t: LegacyTransaction) => {
+      delete t.recurringId;
+      delete t.occurrenceDate;
+    });
+    if (salary) await tx.table('settings').put({ key: 'salary', value: salary });
+    if (retired.length) await tx.table('settings').put({ key: 'retiredRecurring', value: retired });
+  });
 
 db.on('populate', (tx) => {
   tx.table('categories').bulkAdd(DEFAULT_CATEGORIES);

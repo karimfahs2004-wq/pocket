@@ -2,17 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { budgetStatus } from './budget';
 import { addMonthsClamped, isValidDate, todayISO } from './dates';
 import { formatMoney, parseAmount } from './money';
-import { firstOnOrAfter, occurrencesThrough, upcomingPayments } from './recurring';
-import { compareMonths, currentBalance, monthTotals, monthlySeries, spendByCategory } from './reports';
-import type { RecurringRule, Transaction } from './types';
+import { monthsDue, nextPayday, paydayIn } from './salary';
+import { averageMonthlySpend, currentBalance, monthTotals, monthlySeries, spendByCategory } from './reports';
+import type { Transaction } from './types';
 
 const tx = (o: Partial<Transaction>): Transaction => ({
   id: Math.random().toString(), type: 'expense', name: 'x', amountCents: 100,
   categoryId: 'food', date: '2026-11-10', ...o,
-});
-const rule = (o: Partial<RecurringRule>): RecurringRule => ({
-  id: 'r', type: 'expense', name: 'Gym', amountCents: 3000, categoryId: 'gym',
-  frequency: 'monthly', startDate: '2026-01-31', nextDue: '2026-01-31', paused: false, ...o,
 });
 
 describe('parseAmount', () => {
@@ -44,26 +40,20 @@ describe('dates', () => {
   });
 });
 
-describe('recurring schedule', () => {
-  it('keeps day 31 after a short month', () => {
-    expect(occurrencesThrough(rule({}), '2026-04-30')).toEqual([
-      '2026-01-31', '2026-02-28', '2026-03-31', '2026-04-30',
-    ]);
+describe('salary dates', () => {
+  const sal = { amountCents: 100000, payDay: 31, lastPaidMonth: '2026-01' };
+  it('uses the last day of short months', () => {
+    expect(paydayIn('2026-02', 31)).toBe('2026-02-28');
+    expect(paydayIn('2028-02', 31)).toBe('2028-02-29');
+    expect(paydayIn('2026-04', 31)).toBe('2026-04-30');
+    expect(paydayIn('2026-11', 5)).toBe('2026-11-05');
   });
-  it('handles weekly and yearly', () => {
-    expect(occurrencesThrough(rule({ frequency: 'weekly', startDate: '2026-11-02', nextDue: '2026-11-02' }), '2026-11-16'))
-      .toEqual(['2026-11-02', '2026-11-09', '2026-11-16']);
-    expect(firstOnOrAfter('2024-02-29', 'yearly', '2025-01-01')).toBe('2025-02-28');
+  it('is due only once payday arrives', () => {
+    expect(monthsDue(sal, '2026-02-27')).toEqual([]);
+    expect(monthsDue(sal, '2026-02-28')).toEqual(['2026-02']);
+    expect(monthsDue(sal, '2026-04-30')).toEqual(['2026-02', '2026-03', '2026-04']);
   });
-  it('lists upcoming only, skipping paused and income rules', () => {
-    const rules = [
-      rule({ startDate: '2026-11-20', nextDue: '2026-11-20' }),
-      rule({ id: 'p', paused: true, startDate: '2026-11-05', nextDue: '2026-11-05' }),
-      rule({ id: 'i', type: 'income', startDate: '2026-11-25', nextDue: '2026-11-25' }),
-    ];
-    const up = upcomingPayments(rules, '2026-11-02', '2026-12-02');
-    expect(up.map((u) => [u.rule.id, u.date])).toEqual([['r', '2026-11-20']]);
-  });
+  it('gives the next payday', () => expect(nextPayday(sal, '2026-02-28')).toBe('2026-03-31'));
 });
 
 describe('budgetStatus', () => {
@@ -86,9 +76,9 @@ describe('reports', () => {
   it('sums by category', () => expect(spendByCategory(txs, '2026-11').get('food')).toBe(3000));
   it('leaves future entries out of the balance', () =>
     expect(currentBalance(txs, 5000, '2026-11-02')).toBe(5000 + 100000 - 3000 - 9000));
-  it('compares months', () => {
-    const rows = compareMonths(txs, '2026-11', '2026-10');
-    expect(rows[0]).toEqual({ categoryId: 'food', aCents: 3000, bCents: 9000, diffCents: -6000 });
-    expect(rows[1].categoryId).toBe('gym');
+  it('averages only months with expenses, up to the chosen month', () => {
+    expect(averageMonthlySpend(txs, '2026-11')).toEqual({ cents: 7000, months: 2 });
+    expect(averageMonthlySpend(txs, '2026-10')).toEqual({ cents: 9000, months: 1 });
+    expect(averageMonthlySpend(txs, '2026-01')).toEqual({ cents: 0, months: 0 });
   });
 });

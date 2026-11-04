@@ -1,148 +1,176 @@
 import { useMemo, useState } from 'react';
-import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { Empty, MonthPicker, PageHead } from '../components/ui';
+import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { TransactionRow } from '../components/TransactionRow';
+import { Dot, Empty, MonthPicker, useUi } from '../components/ui';
 import { useAppData } from '../data/hooks';
 import { addMonthKey, formatMonth, formatMonthShort, monthOf, todayISO } from '../domain/dates';
-import { compareMonths, monthTotals, monthlySeries, spendByCategory } from '../domain/reports';
+import { averageMonthlySpend, monthTotals, monthlySeries, spendByCategory } from '../domain/reports';
 
+const WINDOW = 6;
 const axis = { fontSize: 12, fill: 'var(--muted)' };
 const tooltipStyle = { background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, color: 'var(--ink)', fontSize: 14 };
 
 export default function Reports() {
   const d = useAppData();
+  const { month, setMonth } = useUi();
   const thisMonth = monthOf(todayISO());
-  const [month, setMonth] = useState(thisMonth);
-  const [compareTo, setCompareTo] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(null);
 
-  const series = useMemo(
-    () => monthlySeries(d.transactions, month, 6).map((m) => ({
-      name: formatMonthShort(m.month),
-      month: m.month,
-      Income: m.incomeCents / 100,
-      Expenses: m.expenseCents / 100,
-    })),
-    [d.transactions, month],
-  );
+  // The chart stays put when you pick a month inside it, and moves only when you leave it.
+  const [end, setEnd] = useState(month > thisMonth ? month : thisMonth);
+  if (month > end) setEnd(month);
+  else if (month <= addMonthKey(end, -WINDOW)) setEnd(addMonthKey(month, WINDOW - 1));
+
+  const [lastMonth, setLastMonth] = useState(month);
+  if (lastMonth !== month) { setLastMonth(month); setSelected(null); }
+
+  const series = useMemo(() => monthlySeries(d.transactions, end, WINDOW), [d.transactions, end]);
 
   if (!d.ready) return null;
   if (!d.transactions.length) {
     return (
       <div className="stack">
-        <PageHead title="Reports" />
-        <Empty title="No data yet"><p className="muted">Charts appear after you add your first transactions.</p></Empty>
+        <MonthPicker />
+        <Empty title="No data yet"><p className="muted">Reports appear after you add your first expenses.</p></Empty>
       </div>
     );
   }
 
   const name = (id: string) => d.categoryById.get(id)?.name ?? 'Uncategorized';
-  const spend = [...spendByCategory(d.transactions, month).entries()].sort((a, b) => b[1] - a[1]);
-  const total = monthTotals(d.transactions, month).expenseCents;
-  const biggest = spend[0]?.[1] ?? 1;
+  const slot = (id: string) => d.categoryById.get(id)?.colorSlot ?? 6;
+  const totals = monthTotals(d.transactions, month);
+  const total = totals.expenseCents;
+  const spend = [...spendByCategory(d.transactions, month).entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([id, cents]) => ({ id, name: name(id), cents, pct: total ? (cents / total) * 100 : 0 }));
+  const pct = (p: number) => (p > 0 && p < 1 ? '<1%' : `${Math.round(p)}%`);
 
-  const other = compareTo ?? addMonthKey(month, -1);
-  const rows = compareMonths(d.transactions, month, other);
-  const otherTotal = monthTotals(d.transactions, other).expenseCents;
-  const diff = total - otherTotal;
-  const months = Array.from({ length: 24 }, (_, i) => addMonthKey(thisMonth, -i));
-  const tick = (v: number) => new Intl.NumberFormat('en-US', { notation: 'compact' }).format(v);
-  const tip = (v: unknown) => d.money(Math.round(Number(v) * 100));
+  const avg = averageMonthlySpend(d.transactions, month);
+  const prev = addMonthKey(month, -1);
+  const prevTotal = monthTotals(d.transactions, prev).expenseCents;
+  const diff = total - prevTotal;
+  const active = spend.find((s) => s.id === selected);
+  const activeItems = active
+    ? d.transactions.filter((t) => t.type === 'expense' && t.categoryId === active.id && monthOf(t.date) === month)
+    : [];
+  const tick = (v: number) => new Intl.NumberFormat('en-US', { notation: 'compact' }).format(v / 100);
 
   return (
     <div className="stack">
-      <PageHead title="Reports" />
-      <MonthPicker month={month} onChange={(m) => { setMonth(m); setCompareTo(null); }} />
+      <MonthPicker />
+
+      <section className="panel" aria-label="Insights">
+        <h2>Insights</h2>
+        <dl className="insights">
+          <div><dt>Total expenses</dt><dd>{d.money(total)}</dd></div>
+          <div><dt>Highest category</dt><dd>{spend[0] ? `${spend[0].name}, ${d.money(spend[0].cents)}` : 'None yet'}</dd></div>
+          <div>
+            <dt>Average per month</dt>
+            <dd>{avg.months ? d.money(avg.cents) : 'None yet'}{avg.months > 0 && <small>{avg.months} {avg.months === 1 ? 'month' : 'months'} with expenses</small>}</dd>
+          </div>
+          <div><dt>Income spent</dt><dd>{totals.incomeCents ? `${Math.round((total / totals.incomeCents) * 100)}%` : 'No income this month'}</dd></div>
+          <div>
+            <dt>Compared with {formatMonthShort(prev)}</dt>
+            <dd>{diff === 0 ? 'No change' : `${d.money(Math.abs(diff))} ${diff > 0 ? 'more' : 'less'}`}
+              {prevTotal > 0 && diff !== 0 && <small>{diff > 0 ? '+' : '-'}{Math.round((Math.abs(diff) / prevTotal) * 100)}%</small>}
+            </dd>
+          </div>
+        </dl>
+      </section>
 
       <section className="panel">
-        <h2>Expenses by category</h2>
+        <h2>Spending by category</h2>
         {spend.length ? (
           <>
-            <p className="muted small">
-              {d.money(total)} in total. {name(spend[0][0])} was the largest, at {Math.round((spend[0][1] / total) * 100)}%.
-            </p>
-            <ul className="rank">
-              {spend.map(([id, cents]) => (
-                <li key={id}>
-                  <span className="rank-label"><span>{name(id)}</span><span className="num">{d.money(cents)}</span></span>
-                  <span className="rank-track"><span style={{ width: `${(cents / biggest) * 100}%` }} /></span>
+            <div className="donut">
+              <ResponsiveContainer width="100%" height={210}>
+                <PieChart>
+                  <Pie
+                    data={spend} dataKey="cents" nameKey="name" innerRadius="66%" outerRadius="96%"
+                    startAngle={90} endAngle={-270} paddingAngle={spend.length > 1 ? 2 : 0} stroke="none"
+                    isAnimationActive={false} rootTabIndex={-1}
+                    onClick={(_, i) => { const id = spend[i].id; setSelected(selected === id ? null : id); }}
+                  >
+                    {spend.map((s) => (
+                      <Cell key={s.id} fill={`var(--series-${slot(s.id) + 1})`} opacity={!selected || selected === s.id ? 1 : 0.28} tabIndex={-1} />
+                    ))}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="donut-center">
+                <span>{active ? active.name : 'Total'}</span>
+                <strong>{d.money(active ? active.cents : total)}</strong>
+                {active && <span>{pct(active.pct)}</span>}
+              </div>
+            </div>
+            <ul className="cat-list">
+              {spend.map((s) => (
+                <li key={s.id}>
+                  <button aria-pressed={selected === s.id} onClick={() => setSelected(selected === s.id ? null : s.id)}>
+                    <Dot slot={slot(s.id)} />
+                    <span className="grow">{s.name}</span>
+                    <span className="muted small num">{pct(s.pct)}</span>
+                    <span className="num cat-amt">{d.money(s.cents)}</span>
+                  </button>
                 </li>
               ))}
             </ul>
+            {active && (
+              <div className="drill">
+                <h3>{active.name} in {formatMonth(month).split(' ')[0]}</h3>
+                <ul className="plain-list">
+                  {activeItems.map((t) => (
+                    <TransactionRow key={t.id} tx={t} category={d.categoryById.get(t.categoryId)} money={d.money} />
+                  ))}
+                </ul>
+              </div>
+            )}
           </>
         ) : <p className="muted">No expenses in {formatMonth(month)}.</p>}
       </section>
 
       <section className="panel">
-        <h2>Income vs. expenses</h2>
-        <p className="muted small">The six months up to {formatMonth(month)}</p>
+        <h2>Monthly spending</h2>
+        <p className="muted small">Tap a bar to open that month.</p>
         <div className="chart">
-          <ResponsiveContainer width="100%" height={230}>
-            <BarChart data={series} barGap={2} margin={{ top: 8, right: 0, left: -12, bottom: 0 }}>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={series} margin={{ top: 8, right: 0, left: -8, bottom: 0 }}>
               <CartesianGrid vertical={false} stroke="var(--line)" />
-              <XAxis dataKey="name" tick={axis} tickLine={false} axisLine={{ stroke: 'var(--line-strong)' }} />
-              <YAxis tick={axis} tickLine={false} axisLine={false} tickFormatter={tick} width={48} />
-              <Tooltip formatter={tip} contentStyle={tooltipStyle} cursor={{ fill: 'var(--wash)' }} />
-              <Legend iconType="circle" iconSize={9} wrapperStyle={{ fontSize: 13 }} formatter={(v) => <span className="ink">{v}</span>} />
-              <Bar dataKey="Income" fill="var(--series-3)" radius={[4, 4, 0, 0]} maxBarSize={16} />
-              <Bar dataKey="Expenses" fill="var(--series-1)" radius={[4, 4, 0, 0]} maxBarSize={16} />
+              <XAxis dataKey="month" tickFormatter={formatMonthShort} tick={axis} tickLine={false} axisLine={{ stroke: 'var(--line-strong)' }} />
+              <YAxis tick={axis} tickLine={false} axisLine={false} tickFormatter={tick} width={46} />
+              <Tooltip
+                formatter={(v) => [d.money(Number(v)), 'Spent']}
+                labelFormatter={(m) => formatMonth(String(m))}
+                contentStyle={tooltipStyle}
+                cursor={{ fill: 'var(--wash)' }}
+              />
+              <Bar dataKey="expenseCents" radius={[4, 4, 0, 0]} maxBarSize={30} isAnimationActive={false} cursor="pointer"
+                onClick={(p) => setMonth((p as unknown as { month: string }).month)}>
+                {series.map((m) => <Cell key={m.month} fill={m.month === month ? 'var(--series-1)' : 'var(--bar-muted)'} />)}
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         </div>
       </section>
 
       <section className="panel">
-        <h2>Spending trend</h2>
-        <p className="muted small">Total expenses per month</p>
-        <div className="chart">
-          <ResponsiveContainer width="100%" height={190}>
-            <LineChart data={series} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
-              <CartesianGrid vertical={false} stroke="var(--line)" />
-              <XAxis dataKey="name" tick={axis} tickLine={false} axisLine={{ stroke: 'var(--line-strong)' }} />
-              <YAxis tick={axis} tickLine={false} axisLine={false} tickFormatter={tick} width={48} />
-              <Tooltip formatter={tip} contentStyle={tooltipStyle} />
-              <Line type="monotone" dataKey="Expenses" stroke="var(--series-1)" strokeWidth={2} dot={{ r: 4, strokeWidth: 2, stroke: 'var(--surface)', fill: 'var(--series-1)' }} />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-        <details className="table-view">
-          <summary>Show the numbers</summary>
-          <table>
-            <thead><tr><th>Month</th><th className="r">Income</th><th className="r">Expenses</th></tr></thead>
-            <tbody>
-              {series.map((s) => (
-                <tr key={s.month}><td>{s.name}</td><td className="r num">{tip(s.Income)}</td><td className="r num">{tip(s.Expenses)}</td></tr>
-              ))}
-            </tbody>
-          </table>
-        </details>
-      </section>
-
-      <section className="panel">
-        <h2>Compare months</h2>
-        <div className="field">
-          <label htmlFor="cmp">Compare {formatMonth(month)} with</label>
-          <select id="cmp" value={other} onChange={(e) => setCompareTo(e.target.value)}>
-            {[...new Set([other, ...months])].filter((m) => m !== month).map((m) => <option key={m} value={m}>{formatMonth(m)}</option>)}
-          </select>
-        </div>
-        <p className="muted small compare-line">
-          {diff === 0 ? 'You spent the same in both months.'
-            : `You spent ${d.money(Math.abs(diff))} ${diff > 0 ? 'more' : 'less'} in ${formatMonth(month)} than in ${formatMonth(other)}.`}
-        </p>
-        {rows.length > 0 && (
-          <table>
-            <thead><tr><th>Category</th><th className="r">{formatMonthShort(month)}</th><th className="r">{formatMonthShort(other)}</th><th className="r">Change</th></tr></thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.categoryId}>
-                  <td>{name(r.categoryId)}</td>
-                  <td className="r num">{d.money(r.aCents)}</td>
-                  <td className="r num">{d.money(r.bCents)}</td>
-                  <td className="r num">{r.diffCents > 0 ? '+' : ''}{d.money(r.diffCents)}</td>
+        <h2>Income vs. expenses</h2>
+        <table>
+          <thead><tr><th>Month</th><th className="r">Income</th><th className="r">Spent</th><th className="r">Left</th></tr></thead>
+          <tbody>
+            {[...series].reverse().map((m) => {
+              const left = m.incomeCents - m.expenseCents;
+              return (
+                <tr key={m.month} className={m.month === month ? 'current' : undefined}>
+                  <td>{formatMonthShort(m.month)}</td>
+                  <td className="r num">{d.money(m.incomeCents)}</td>
+                  <td className="r num">{d.money(m.expenseCents)}</td>
+                  <td className={`r num${left < 0 ? ' negative-text' : ''}`}>{d.money(left)}</td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+              );
+            })}
+          </tbody>
+        </table>
       </section>
     </div>
   );
