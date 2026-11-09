@@ -5,8 +5,6 @@ import { checkPin, clearOldFaceIdLock } from '../data/pin';
 import { getSettings } from '../data/repo';
 import { PinPad } from './PinPad';
 
-/** How long the app can sit in the background before it locks again. */
-const RELOCK_AFTER_MS = 60_000;
 /** After this many wrong PINs in a row, wait before trying again. */
 const MAX_TRIES = 5;
 const WAIT_SECONDS = 30;
@@ -20,7 +18,8 @@ export function LockGate({ children }: { children: ReactNode }) {
   const [now, setNow] = useState(Date.now());
   const [help, setHelp] = useState(false);
   const [error, setError] = useState('');
-  const hiddenAt = useRef<number | null>(null);
+  const pinRef = useRef(hasPin);
+  pinRef.current = hasPin;
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { void clearOldFaceIdLock(); }, []);
@@ -29,11 +28,10 @@ export function LockGate({ children }: { children: ReactNode }) {
   const openedUnlocked = settings !== undefined && !hasPin;
   useEffect(() => { if (openedUnlocked) setUnlocked(true); }, [openedUnlocked]);
 
-  // Lock again after the app has been in the background for a while.
+  // Lock the moment you leave the app, so the PIN is needed every time you come back.
   useEffect(() => {
     const onVis = () => {
-      if (document.visibilityState === 'hidden') hiddenAt.current = Date.now();
-      else if (hiddenAt.current && Date.now() - hiddenAt.current > RELOCK_AFTER_MS) setUnlocked(false);
+      if (document.visibilityState === 'hidden' && pinRef.current) setUnlocked(false);
     };
     document.addEventListener('visibilitychange', onVis);
     return () => document.removeEventListener('visibilitychange', onVis);

@@ -210,7 +210,7 @@ export default function Settings() {
       <section className="panel form">
         <h2>PIN lock</h2>
         <p className="muted">{pinOn
-          ? 'Pocket asks for your 4-digit PIN when you open it, and again after a minute in the background.'
+          ? 'Pocket asks for your 4-digit PIN every time you open it or come back to it.'
           : 'Ask for a 4-digit PIN when opening Pocket.'}</p>
         {!pinOn && !d.settings.lastBackupAt && <p className="hint">Save a backup first. If you forget your PIN, a backup is the only way back in.</p>}
         <div className="row-actions start">
