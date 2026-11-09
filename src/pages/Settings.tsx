@@ -29,7 +29,7 @@ function CategorySheet({ category, suggested, onClose }: { category?: Category; 
       <form className="form" onSubmit={submit} noValidate>
         <div className="field">
           <label htmlFor="c-name">Name</label>
-          <input id="c-name" value={name} onChange={(e) => setName(e.target.value)} autoFocus={!category} />
+          <input id="c-name" value={name} onChange={(e) => setName(e.target.value)} autoFocus={!category} data-autofocus={!category || undefined} />
           {error && <p className="error">{error}</p>}
         </div>
         <div className="field">

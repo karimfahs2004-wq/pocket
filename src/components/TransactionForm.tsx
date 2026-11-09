@@ -62,16 +62,15 @@ export function TransactionForm({ tx, initialType, onDone }: {
     e.preventDefault();
     const cents = parseAmount(amount);
     const next: Record<string, string> = {};
+    if (!name.trim()) next.name = isExpense ? 'Enter a name, like Groceries.' : 'Enter a name, like Freelance job.';
     if (!cents) next.amount = 'Enter an amount above 0, like 12.50.';
     if (!date) next.date = 'Choose a date.';
     setErrors(next);
     if (Object.keys(next).length) return;
     // Category is optional: a skipped one is saved as Other (recreated if it was removed).
     const finalCategory = categoryId || (await addCategory('Other'));
-    // Name is optional too: a skipped one uses the category's name, like Food.
-    const finalName = name.trim() || categories.find((c) => c.id === finalCategory)?.name || (isExpense ? 'Other' : 'Income');
     await saveTransaction({
-      ...tx, type, name: finalName, amountCents: cents!, categoryId: finalCategory, date,
+      ...tx, type, name: name.trim(), amountCents: cents!, categoryId: finalCategory, date,
       notes: notes.trim() || undefined,
     });
     const when = date === today || tx ? '' : ` for ${formatDay(date)}`;
@@ -87,10 +86,9 @@ export function TransactionForm({ tx, initialType, onDone }: {
 
   return (
     <form onSubmit={submit} noValidate className="form">
-      <AmountField label="Amount" large autoFocus={!tx} value={amount} onChange={setAmount} error={errors.amount} />
       <div className="field">
-        <label htmlFor="tx-name">{isExpense ? 'Expense name' : 'Name'} <span className="muted">(optional)</span></label>
-        <input id="tx-name" value={name} onChange={(e) => typeName(e.target.value)} placeholder={isExpense ? 'Groceries' : 'Freelance job'} aria-invalid={!!errors.name} autoCapitalize="sentences" enterKeyHint="done" />
+        <label htmlFor="tx-name">{isExpense ? 'Expense name' : 'Name'}</label>
+        <input id="tx-name" value={name} onChange={(e) => typeName(e.target.value)} placeholder={isExpense ? 'Groceries' : 'Freelance job'} autoFocus={!tx} data-autofocus={!tx || undefined} aria-invalid={!!errors.name} autoCapitalize="sentences" enterKeyHint="done" />
         {errors.name && <p className="error">{errors.name}</p>}
         {isExpense && !tx && !name && recent.length > 0 && (
           <div className="suggest" role="group" aria-label="Repeat a recent expense">
@@ -102,6 +100,7 @@ export function TransactionForm({ tx, initialType, onDone }: {
           </div>
         )}
       </div>
+      <AmountField label="Amount" large value={amount} onChange={setAmount} error={errors.amount} />
       {isExpense && <CategoryPicker categories={options} value={categoryId} onChange={setCategoryId} optional />}
       <div className="field">
         <label htmlFor="tx-date">Date</label>

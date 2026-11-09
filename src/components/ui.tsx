@@ -12,7 +12,11 @@ export function Sheet({ title, onClose, children }: { title: string; onClose: ()
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const d = ref.current;
-    if (d && !d.open) d.showModal();
+    if (d && !d.open) {
+      d.showModal();
+      // showModal focuses the first button (Close), so move focus to the field meant to be first.
+      d.querySelector<HTMLElement>('[data-autofocus]')?.focus();
+    }
   }, []);
   return (
     <dialog

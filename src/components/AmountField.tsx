@@ -17,6 +17,7 @@ export function AmountField({ label, value, onChange, error, large, autoFocus, a
         placeholder="0.00"
         value={value}
         autoFocus={autoFocus}
+        data-autofocus={autoFocus || undefined}
         aria-invalid={!!error}
         onChange={(e) => onChange(e.target.value)}
       />
