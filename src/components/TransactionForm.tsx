@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useAppData } from '../data/hooks';
-import { deleteTransaction, restoreTransaction, saveTransaction } from '../data/repo';
+import { addCategory, deleteTransaction, restoreTransaction, saveTransaction } from '../data/repo';
 import { formatDay, todayISO } from '../domain/dates';
 import { centsToInput, parseAmount } from '../domain/money';
 import type { Transaction, TxType } from '../domain/types';
@@ -59,12 +59,13 @@ export function TransactionForm({ tx, initialType, onDone }: {
     const next: Record<string, string> = {};
     if (!cents) next.amount = 'Enter an amount above 0, like 12.50.';
     if (!name.trim()) next.name = isExpense ? 'Enter a name, like Groceries.' : 'Enter a name, like Freelance job.';
-    if (!categoryId) next.category = 'Choose a category.';
     if (!date) next.date = 'Choose a date.';
     setErrors(next);
     if (Object.keys(next).length) return;
+    // Category is optional: a skipped one is saved as Other (recreated if it was removed).
+    const finalCategory = categoryId || (await addCategory('Other'));
     await saveTransaction({
-      ...tx, type, name: name.trim(), amountCents: cents!, categoryId, date,
+      ...tx, type, name: name.trim(), amountCents: cents!, categoryId: finalCategory, date,
       notes: notes.trim() || undefined,
     });
     const when = date === today || tx ? '' : ` for ${formatDay(date)}`;
@@ -93,8 +94,7 @@ export function TransactionForm({ tx, initialType, onDone }: {
           </div>
         )}
       </div>
-      {isExpense && <CategoryPicker categories={options} value={categoryId} onChange={setCategoryId} />}
-      {errors.category && <p className="error">{errors.category}</p>}
+      {isExpense && <CategoryPicker categories={options} value={categoryId} onChange={setCategoryId} optional />}
       <div className="field">
         <label htmlFor="tx-date">Date</label>
         <input id="tx-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} aria-invalid={!!errors.date} />

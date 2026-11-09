@@ -5,8 +5,8 @@ import type { Category } from '../domain/types';
 import { Dot } from './ui';
 
 /** Tappable chips: faster on a phone than a dropdown. New categories can be added right here. */
-export function CategoryPicker({ categories, value, onChange }: {
-  categories: Category[]; value: string; onChange: (id: string) => void;
+export function CategoryPicker({ categories, value, onChange, optional }: {
+  categories: Category[]; value: string; onChange: (id: string) => void; optional?: boolean;
 }) {
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState('');
@@ -20,10 +20,10 @@ export function CategoryPicker({ categories, value, onChange }: {
 
   return (
     <div className="field">
-      <span className="label" id="cat-label">Category</span>
+      <span className="label" id="cat-label">Category{optional && <span className="muted"> (optional)</span>}</span>
       <div className="chips" role="group" aria-labelledby="cat-label">
         {categories.map((c) => (
-          <button type="button" key={c.id} className="chip" aria-pressed={c.id === value} onClick={() => onChange(c.id)}>
+          <button type="button" key={c.id} className="chip" aria-pressed={c.id === value} onClick={() => onChange(optional && c.id === value ? '' : c.id)}>
             <Dot slot={c.colorSlot} />{c.name}
           </button>
         ))}
