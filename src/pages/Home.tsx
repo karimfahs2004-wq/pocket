@@ -10,7 +10,7 @@ import { OVERALL_BUDGET_ID } from '../domain/types';
 
 export default function Home() {
   const d = useAppData();
-  const { month, newTransaction } = useUi();
+  const { month } = useUi();
   if (!d.ready) return null;
 
   const today = todayISO();
@@ -82,7 +82,7 @@ export default function Home() {
             ))}
           </ul>
         ) : (
-          <p className="muted">No expenses {label}. <button className="link" onClick={() => newTransaction()}>Add an expense</button></p>
+          <p className="muted">No expenses {label}. Tap + to add one.</p>
         )}
       </section>
 

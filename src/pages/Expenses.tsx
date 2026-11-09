@@ -6,7 +6,7 @@ import { formatDayFull, monthOf } from '../domain/dates';
 
 export default function Expenses() {
   const d = useAppData();
-  const { month, newTransaction } = useUi();
+  const { month } = useUi();
 
   const expenses = useMemo(
     () => d.transactions.filter((t) => t.type === 'expense' && monthOf(t.date) === month),
@@ -30,7 +30,7 @@ export default function Expenses() {
       </div>
       {groups.length === 0 ? (
         <Empty title="No expenses this month">
-          <button className="btn primary" onClick={() => newTransaction()}>Add expense</button>
+          <p className="muted">Tap + to add one.</p>
         </Empty>
       ) : (
         groups.map(([date, items]) => (
