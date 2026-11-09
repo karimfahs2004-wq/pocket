@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect } from 'react';
 import { NavLink, Route, Routes } from 'react-router-dom';
 import { ChartColumn, House, Plus, Receipt, Target, type LucideIcon } from 'lucide-react';
-import { syncSalary } from './data/repo';
+import { fixCategoryColors, syncSalary } from './data/repo';
 import { UiProvider, useUi } from './components/ui';
 import Home from './pages/Home';
 import Expenses from './pages/Expenses';
@@ -56,6 +56,7 @@ export default function App() {
   useEffect(() => {
     // Ask the browser not to clear this app's data when the device runs low on space.
     navigator.storage?.persist?.();
+    void fixCategoryColors();
     const sync = () => {
       if (document.visibilityState === 'visible') void syncSalary();
     };

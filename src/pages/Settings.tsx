@@ -1,20 +1,21 @@
-import { ArrowLeft, Download, Pencil, Plus, Trash2, Upload } from 'lucide-react';
+import { ArrowLeft, ChevronRight, Download, Pencil, Plus, Trash2, Upload } from 'lucide-react';
 import { useRef, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { AmountField } from '../components/AmountField';
 import { Dot, Sheet, useUi } from '../components/ui';
-import { buildBackup, restoreBackup } from '../data/backup';
+import { restoreBackup } from '../data/backup';
+import { saveBackupFile } from '../data/saveBackup';
 import { useAppData } from '../data/hooks';
 import { addCategory, removeCategory, updateCategory, updateSettings } from '../data/repo';
 import { centsToInput, parseAmount } from '../domain/money';
-import { todayISO } from '../domain/dates';
 import type { Category } from '../domain/types';
+import { COLOR_SLOTS, freeSlot } from '../domain/colors';
 
 const CURRENCIES = ['USD', 'LBP', 'EUR', 'GBP', 'AED', 'SAR'];
 
-function CategorySheet({ category, onClose }: { category?: Category; onClose: () => void }) {
+function CategorySheet({ category, suggested, onClose }: { category?: Category; suggested: number; onClose: () => void }) {
   const [name, setName] = useState(category?.name ?? '');
-  const [slot, setSlot] = useState(category?.colorSlot ?? 0);
+  const [slot, setSlot] = useState(category?.colorSlot ?? suggested);
   const [error, setError] = useState('');
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -34,7 +35,7 @@ function CategorySheet({ category, onClose }: { category?: Category; onClose: ()
         <div className="field">
           <span className="label">Color</span>
           <div className="swatches">
-            {Array.from({ length: 8 }, (_, i) => (
+            {Array.from({ length: COLOR_SLOTS }, (_, i) => (
               <button type="button" key={i} aria-label={`Color ${i + 1}`} aria-pressed={slot === i} onClick={() => setSlot(i)} style={{ background: `var(--series-${i + 1})` }} />
             ))}
           </div>
@@ -67,27 +68,7 @@ export default function Settings() {
   };
 
   const download = async () => {
-    const backup = await buildBackup();
-    const name = `pocket-backup-${todayISO()}.json`;
-    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
-    const file = new File([blob], name, { type: 'application/json' });
-    // Home-screen apps on phones handle the share menu better than downloads.
-    if (navigator.canShare?.({ files: [file] })) {
-      try {
-        await navigator.share({ files: [file], title: name });
-      } catch {
-        return; // Cancelled, so don't record a backup.
-      }
-    } else {
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = name;
-      a.click();
-      URL.revokeObjectURL(url);
-    }
-    await updateSettings({ lastBackupAt: backup.exportedAt });
-    toast({ message: 'Backup saved' });
+    if (await saveBackupFile()) toast({ message: 'Backup saved' });
   };
 
   const restore = async (file?: File) => {
@@ -136,6 +117,13 @@ export default function Settings() {
         </div>
       </header>
 
+      <Link to="/income" className="panel link-row">
+        <span className="grow"><strong>Salary and income</strong><br />
+          <span className="muted small">{d.settings.salary ? `${d.money(d.settings.salary.amountCents)} a month, paid on day ${d.settings.salary.payDay}` : 'Set your salary or add other income'}</span>
+        </span>
+        <ChevronRight size={20} aria-hidden />
+      </Link>
+
       <section className="panel form">
         <h2>Money</h2>
         <form onSubmit={saveOpening} className="form" noValidate>
@@ -180,7 +168,7 @@ export default function Settings() {
         </div>
       </section>
 
-      {sheet && <CategorySheet category={sheet.category} onClose={() => setSheet(null)} />}
+      {sheet && <CategorySheet category={sheet.category} suggested={freeSlot(list.map((c) => c.colorSlot))} onClose={() => setSheet(null)} />}
     </div>
   );
 }

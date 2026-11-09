@@ -1,4 +1,5 @@
 import { addMonthKey, monthOf, todayISO } from '../domain/dates';
+import { dedupeSlots, freeSlot } from '../domain/colors';
 import { monthsDue, paydayIn } from '../domain/salary';
 import {
   DEFAULT_SETTINGS,
@@ -76,12 +77,23 @@ export async function addCategory(name: string, colorSlot?: number): Promise<str
       if (same.archived) await db.categories.update(same.id, { archived: false });
       return same.id;
     }
-    const active = all.filter((c) => !c.archived);
-    const used = (slot: number) => active.filter((c) => c.colorSlot === slot).length;
-    const slot = colorSlot ?? [0, 1, 2, 3, 4, 5, 6, 7].sort((a, b) => used(a) - used(b))[0];
+    const slot = colorSlot ?? freeSlot(all.filter((c) => !c.archived).map((c) => c.colorSlot));
     const id = newId();
     await db.categories.add({ id, name: clean, kind: 'expense', colorSlot: slot });
     return id;
+  });
+}
+
+/** Fixes categories that share a colour, so charts can always tell them apart. */
+export async function fixCategoryColors() {
+  await db.transaction('rw', db.categories, db.transactions, async () => {
+    const uses = new Map<string, number>();
+    await db.transactions.each((t) => { uses.set(t.categoryId, (uses.get(t.categoryId) ?? 0) + 1); });
+    // The most-used category keeps its colour, so the ones you know best don't change.
+    const active = (await db.categories.toArray())
+      .filter((c) => c.kind === 'expense' && !c.archived)
+      .sort((x, y) => (uses.get(y.id) ?? 0) - (uses.get(x.id) ?? 0));
+    for (const { id, colorSlot } of dedupeSlots(active)) await db.categories.update(id, { colorSlot });
   });
 }
 

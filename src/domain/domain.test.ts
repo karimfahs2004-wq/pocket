@@ -1,3 +1,4 @@
+import { dedupeSlots, freeSlot } from './colors';
 import { describe, expect, it } from 'vitest';
 import { budgetStatus } from './budget';
 import { addMonthsClamped, isValidDate, todayISO } from './dates';
@@ -80,5 +81,18 @@ describe('reports', () => {
     expect(averageMonthlySpend(txs, '2026-11')).toEqual({ cents: 7000, months: 2 });
     expect(averageMonthlySpend(txs, '2026-10')).toEqual({ cents: 9000, months: 1 });
     expect(averageMonthlySpend(txs, '2026-01')).toEqual({ cents: 0, months: 0 });
+  });
+});
+
+
+describe('category colours', () => {
+  it('picks an unused colour first', () => {
+    expect(freeSlot([0, 1, 2, 3, 4, 5, 6])).toBe(7);
+    expect(freeSlot([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 0])).toBe(1);
+  });
+  it('gives duplicates a free colour, keeping the first', () => {
+    const cats = [{ id: 'food', colorSlot: 0 }, { id: 'gym', colorSlot: 2 }, { id: 'pets', colorSlot: 0 }];
+    expect(dedupeSlots(cats)).toEqual([{ id: 'pets', colorSlot: 1 }]);
+    expect(dedupeSlots([{ id: 'a', colorSlot: 3 }])).toEqual([]);
   });
 });

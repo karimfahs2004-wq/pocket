@@ -22,6 +22,7 @@
   --critical-ink: #9a1f1f;
   --series-1: #2a78d6; --series-2: #eb6834; --series-3: #1baf7a; --series-4: #eda100;
   --series-5: #e87ba4; --series-6: #008300; --series-7: #6250d6; --series-8: #e34948;
+  --series-9: #0e9aa7; --series-10: #a0672b; --series-11: #a63fb0; --series-12: #9aa619;
   --display: 'Bricolage Grotesque Variable', system-ui, sans-serif;
   --body: 'Instrument Sans Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --nav-h: 62px;
@@ -49,6 +50,7 @@
     --critical-ink: #ffb3b3;
     --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70; --series-4: #c98500;
     --series-5: #d55181; --series-6: #008300; --series-7: #9085e9; --series-8: #e66767;
+    --series-9: #0094a8; --series-10: #b07a3c; --series-11: #b45cbd; --series-12: #8a941a;
   }
 }
 
@@ -168,7 +170,17 @@ button { cursor: pointer; }
 .month-picker { display: flex; align-items: center; flex: 1; min-width: 0; margin-left: -10px; }
 .month-picker h1 { font-size: 1.3rem; white-space: nowrap; }
 .month-bar .link { flex: none; color: var(--muted); }
-.month-bar > .icon-btn { margin-right: -10px; }
+.month-bar .edge:last-child { margin-right: -10px; }
+.month-bar .edge + .edge { margin-left: -6px; }
+.stat-label { display: inline-flex; align-items: center; gap: 2px; }
+.link-row { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+.backup-prompt { border-color: var(--line-strong); }
+.backup-prompt .btn { justify-self: start; }
+.search-bar { display: flex; gap: 8px; min-height: 44px; }
+.search { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; padding-left: 12px; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 10px; color: var(--muted); }
+.search input { border: 0; background: none; padding-left: 0; min-width: 0; color: var(--ink); }
+.search input:focus { outline: none; }
+.search:focus-within { outline: 2px solid var(--series-1); outline-offset: 1px; }
 
 /* Reports */
 .insights { margin: 0; display: grid; }
@@ -241,6 +253,7 @@ textarea { resize: vertical; }
 .inline-add { display: flex; gap: 8px; margin-top: 4px; }
 .inline-add input { flex: 1; min-width: 0; }
 .suggest { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; margin-top: 2px; }
+.suggest button .muted { margin-left: 2px; }
 .suggest button { flex: none; min-height: 34px; padding: 3px 10px; border: 0; border-radius: 8px; background: var(--wash); font-size: 0.875rem; }
 .swatches { display: flex; flex-wrap: wrap; gap: 8px; }
 .swatches button { width: 38px; height: 38px; border-radius: 50%; border: 0; }

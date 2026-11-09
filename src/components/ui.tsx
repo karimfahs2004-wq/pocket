@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ChevronLeft, ChevronRight, CircleAlert, TriangleAlert, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CircleAlert, Settings as Gear, TriangleAlert, X } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { addMonthKey, formatMonth, monthOf, todayISO } from '../domain/dates';
 import type { Transaction, TxType } from '../domain/types';
 import type { BudgetLevel } from '../domain/budget';
@@ -109,7 +110,7 @@ export function UiProvider({ children }: { children: ReactNode }) {
 // --- Small shared pieces
 
 /** The chosen month is shared, so it stays the same as you move between tabs. */
-export function MonthPicker({ action }: { action?: ReactNode }) {
+export function MonthPicker({ action, settings = true }: { action?: ReactNode; settings?: boolean }) {
   const { month, setMonth } = useUi();
   const current = monthOf(todayISO());
   return (
@@ -121,6 +122,7 @@ export function MonthPicker({ action }: { action?: ReactNode }) {
       </div>
       {month !== current && <button className="link small" onClick={() => setMonth(current)}>This month</button>}
       {action}
+      {settings && <Link to="/settings" className="icon-btn edge" aria-label="Settings"><Gear size={22} aria-hidden /></Link>}
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
-import { ChevronRight, CircleAlert, CloudDownload, Settings as Gear } from 'lucide-react';
+import { ChevronRight, CircleAlert, CloudDownload } from 'lucide-react';
+import { saveBackupFile } from '../data/saveBackup';
 import { TransactionRow } from '../components/TransactionRow';
 import { MonthPicker, useUi } from '../components/ui';
 import { useAppData } from '../data/hooks';
@@ -8,9 +9,12 @@ import { nextPayday } from '../domain/salary';
 import { currentBalance, monthTotals, spendByCategory } from '../domain/reports';
 import { OVERALL_BUDGET_ID } from '../domain/types';
 
+/** How often to ask for a backup. */
+const BACKUP_EVERY_DAYS = 14;
+
 export default function Home() {
   const d = useAppData();
-  const { month } = useUi();
+  const { month, toast } = useUi();
   if (!d.ready) return null;
 
   const today = todayISO();
@@ -37,7 +41,7 @@ export default function Home() {
 
   return (
     <div className="stack">
-      <MonthPicker action={<Link to="/settings" className="icon-btn" aria-label="Settings"><Gear size={22} aria-hidden /></Link>} />
+      <MonthPicker />
 
       <section className="hero" aria-label="Money left">
         <p className="hero-label">{left < 0 ? `Overspent ${label}` : `Left ${label}`}</p>
@@ -49,8 +53,8 @@ export default function Home() {
       </section>
 
       <section className="stats" aria-label="Summary">
-        <Link to="/income"><span className="muted">Income</span><strong>{d.money(totals.incomeCents)}</strong></Link>
-        <Link to="/expenses"><span className="muted">Expenses</span><strong>{d.money(totals.expenseCents)}</strong></Link>
+        <Link to="/income"><span className="muted stat-label">Income<ChevronRight size={14} aria-hidden /></span><strong>{d.money(totals.incomeCents)}</strong></Link>
+        <Link to="/expenses"><span className="muted stat-label">Expenses<ChevronRight size={14} aria-hidden /></span><strong>{d.money(totals.expenseCents)}</strong></Link>
         <div><span className="muted">Overall balance today</span><strong>{d.money(balance)}</strong></div>
       </section>
 
@@ -73,6 +77,17 @@ export default function Home() {
         </Link>
       )}
 
+      {d.transactions.length > 0 && backupDays > BACKUP_EVERY_DAYS && (
+        <section className="panel backup-prompt" aria-label="Backup">
+          <div className="line">
+            <CloudDownload size={20} aria-hidden />
+            <strong className="grow">{d.settings.lastBackupAt ? `Last backup was ${Math.floor(backupDays)} days ago` : 'Your data has no backup yet'}</strong>
+          </div>
+          <p className="muted small">Your data is stored only on this phone. If it's lost or reset, a backup is the only way to get it back.</p>
+          <button className="btn primary" onClick={async () => { if (await saveBackupFile()) toast({ message: 'Backup saved' }); }}>Save backup now</button>
+        </section>
+      )}
+
       <section className="panel">
         <div className="panel-head"><h2>Recent expenses</h2>{recent.length > 0 && <Link to="/expenses">See all</Link>}</div>
         {recent.length ? (
@@ -86,13 +101,6 @@ export default function Home() {
         )}
       </section>
 
-      {!isNew && backupDays > 30 && (
-        <Link to="/settings" className="notice">
-          <CloudDownload size={18} aria-hidden />
-          <span className="grow">Your data is only on this device. Save a backup.</span>
-          <ChevronRight size={18} aria-hidden />
-        </Link>
-      )}
     </div>
   );
 }

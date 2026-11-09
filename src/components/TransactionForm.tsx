@@ -36,21 +36,26 @@ export function TransactionForm({ tx, initialType, onDone }: {
       .sort((a, b) => (uses.get(b.id) ?? 0) - (uses.get(a.id) ?? 0) || a.name.localeCompare(b.name));
   }, [categories, expenses, categoryId]);
 
-  // Tapping a recent name fills in its category, which saves most of the typing.
+  // Your last few expense names, newest first. Expenses are already sorted newest first.
   const recent = useMemo(() => {
-    const seen = new Map<string, string>();
-    for (const t of expenses) {
-      if (!seen.has(t.name) && seen.size < 4) seen.set(t.name, t.categoryId);
-    }
-    return [...seen.entries()];
+    const seen = new Set<string>();
+    return expenses.filter((t) => !seen.has(t.name) && seen.size < 4 && seen.add(t.name));
   }, [expenses]);
 
-  const pickName = (n: string) => {
+  const usable = (id: string) => categories.some((c) => c.id === id && !c.archived);
+
+  /** Typing a name you've used before fills in its category. */
+  const typeName = (n: string) => {
     setName(n);
     const known = expenses.find((t) => t.name.toLowerCase() === n.trim().toLowerCase());
-    if (known && !categoryId && categories.find((c) => c.id === known.categoryId && !c.archived)) {
-      setCategoryId(known.categoryId);
-    }
+    if (known && !categoryId && usable(known.categoryId)) setCategoryId(known.categoryId);
+  };
+
+  /** Tapping a recent expense repeats it: name, category, and last amount if you haven't typed one. */
+  const repeat = (t: Transaction) => {
+    setName(t.name);
+    if (!categoryId && usable(t.categoryId)) setCategoryId(t.categoryId);
+    if (!amount) setAmount(centsToInput(t.amountCents));
   };
 
   const submit = async (e: FormEvent) => {
@@ -58,14 +63,15 @@ export function TransactionForm({ tx, initialType, onDone }: {
     const cents = parseAmount(amount);
     const next: Record<string, string> = {};
     if (!cents) next.amount = 'Enter an amount above 0, like 12.50.';
-    if (!name.trim()) next.name = isExpense ? 'Enter a name, like Groceries.' : 'Enter a name, like Freelance job.';
     if (!date) next.date = 'Choose a date.';
     setErrors(next);
     if (Object.keys(next).length) return;
     // Category is optional: a skipped one is saved as Other (recreated if it was removed).
     const finalCategory = categoryId || (await addCategory('Other'));
+    // Name is optional too: a skipped one uses the category's name, like Food.
+    const finalName = name.trim() || categories.find((c) => c.id === finalCategory)?.name || (isExpense ? 'Other' : 'Income');
     await saveTransaction({
-      ...tx, type, name: name.trim(), amountCents: cents!, categoryId: finalCategory, date,
+      ...tx, type, name: finalName, amountCents: cents!, categoryId: finalCategory, date,
       notes: notes.trim() || undefined,
     });
     const when = date === today || tx ? '' : ` for ${formatDay(date)}`;
@@ -83,13 +89,15 @@ export function TransactionForm({ tx, initialType, onDone }: {
     <form onSubmit={submit} noValidate className="form">
       <AmountField label="Amount" large autoFocus={!tx} value={amount} onChange={setAmount} error={errors.amount} />
       <div className="field">
-        <label htmlFor="tx-name">{isExpense ? 'Expense name' : 'Name'}</label>
-        <input id="tx-name" value={name} onChange={(e) => pickName(e.target.value)} placeholder={isExpense ? 'Groceries' : 'Freelance job'} aria-invalid={!!errors.name} autoCapitalize="sentences" enterKeyHint="done" />
+        <label htmlFor="tx-name">{isExpense ? 'Expense name' : 'Name'} <span className="muted">(optional)</span></label>
+        <input id="tx-name" value={name} onChange={(e) => typeName(e.target.value)} placeholder={isExpense ? 'Groceries' : 'Freelance job'} aria-invalid={!!errors.name} autoCapitalize="sentences" enterKeyHint="done" />
         {errors.name && <p className="error">{errors.name}</p>}
         {isExpense && !tx && !name && recent.length > 0 && (
-          <div className="suggest" role="group" aria-label="Recent expenses">
-            {recent.map(([n]) => (
-              <button type="button" key={n} onClick={() => pickName(n)}>{n}</button>
+          <div className="suggest" role="group" aria-label="Repeat a recent expense">
+            {recent.map((t) => (
+              <button type="button" key={t.id} onClick={() => repeat(t)} aria-label={`Repeat ${t.name}, ${centsToInput(t.amountCents)}`}>
+                {t.name} <span className="muted">{centsToInput(t.amountCents)}</span>
+              </button>
             ))}
           </div>
         )}

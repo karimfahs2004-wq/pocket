@@ -97,7 +97,7 @@ export default function Income() {
         )}
       </section>
 
-      <MonthPicker />
+      <MonthPicker settings={false} />
       <section className="panel">
         <div className="panel-head">
           <h2>Received: <span className="num">{d.money(total)}</span></h2>
