@@ -1,3 +1,4 @@
+import { Pencil } from 'lucide-react';
 import type { Category, Transaction } from '../domain/types';
 import { formatDay } from '../domain/dates';
 import { Dot, useUi } from './ui';
@@ -7,8 +8,9 @@ export function TransactionRow({ tx, category, money, showDate = true }: {
 }) {
   const { editTransaction } = useUi();
   return (
-    <li>
-      <button className="tx-row" onClick={() => editTransaction(tx)} aria-label={`Edit ${tx.name}`}>
+    <li className="tx-item">
+      {/* Tapping the row or the pencil both open the edit screen. */}
+      <button className="tx-row" onClick={() => editTransaction(tx)} tabIndex={-1} aria-hidden>
         <Dot slot={category?.colorSlot ?? 6} />
         <span className="tx-main">
           <span className="tx-name">{tx.name}</span>
@@ -17,6 +19,9 @@ export function TransactionRow({ tx, category, money, showDate = true }: {
         <span className={`tx-amount num ${tx.type}`}>
           {tx.type === 'income' ? '+' : ''}{money(tx.amountCents)}
         </span>
+      </button>
+      <button className="icon-btn tx-edit" onClick={() => editTransaction(tx)} aria-label={`Edit ${tx.name}, ${money(tx.amountCents)}`}>
+        <Pencil size={18} aria-hidden />
       </button>
     </li>
   );

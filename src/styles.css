@@ -135,7 +135,9 @@ button { cursor: pointer; }
 .cards { display: grid; gap: 10px; }
 .empty { display: grid; gap: 8px; justify-items: start; background: var(--surface); border: 1px dashed var(--line-strong); border-radius: 14px; padding: 18px; }
 
-.tx-row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 0; background: none; border: 0; text-align: left; min-height: 56px; }
+.tx-item { display: flex; align-items: center; gap: 2px; }
+.tx-edit { margin-right: -10px; color: var(--muted); }
+.tx-row { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 0; background: none; border: 0; text-align: left; min-height: 56px; }
 .tx-main { display: grid; flex: 1; min-width: 0; }
 .tx-name { font-weight: 550; }
 .tx-name, .tx-meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
