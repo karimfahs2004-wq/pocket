@@ -15,8 +15,8 @@ export async function buildBackup() {
     db.savings.toArray(),
     getSettings(),
   ]);
-  // The Face ID passkey belongs to this phone, so it never goes into a backup.
-  const { lockCredentialId: _lock, ...settings } = allSettings;
+  // The PIN belongs to this phone, so it never goes into a backup.
+  const { pinHash: _h, pinSalt: _s, ...settings } = allSettings;
   return {
     app: APP,
     version: VERSION,
@@ -69,17 +69,19 @@ export function validateBackup(raw: unknown) {
 
 /**
  * Replaces everything in the app with the backup, all or nothing. Old backups are upgraded.
- * The Face ID lock stays as it is unless `keepLock` is false.
+ * The PIN lock stays as it is unless `keepLock` is false.
  */
 export async function restoreBackup(raw: unknown, today = todayISO(), keepLock = true) {
   const data = validateBackup(raw);
   const old = migrateLegacy(data.recurring, data.transactions as LegacyTransaction[], today, newId);
   const transactions = [...data.transactions.map(stripLegacy), ...old.added];
-  const lock = keepLock ? (await getSettings()).lockCredentialId : undefined;
-  const { lockCredentialId: _ignored, ...backupSettings } = data.settings as typeof data.settings & { lockCredentialId?: string };
+  const current = await getSettings();
+  const lock = keepLock && current.pinHash ? { pinHash: current.pinHash, pinSalt: current.pinSalt } : {};
+  const { pinHash: _h, pinSalt: _s, lockCredentialId: _l, ...backupSettings } =
+    data.settings as typeof data.settings & { pinHash?: string; pinSalt?: string; lockCredentialId?: string };
   const settings = {
     ...backupSettings,
-    ...(lock ? { lockCredentialId: lock } : {}),
+    ...lock,
     ...(old.salary ? { salary: old.salary } : {}),
     ...(old.retired.length ? { retiredRecurring: old.retired } : {}),
   };

@@ -1,6 +1,7 @@
 import { ChevronRight, Download, Pencil, Plus, Trash2, Upload } from 'lucide-react';
-import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { createLock, lockAvailable, unlock } from '../data/lock';
+import { useRef, useState, type FormEvent } from 'react';
+import { checkPin, removePin, setPin } from '../data/pin';
+import { PinPad } from '../components/PinPad';
 import { Link } from 'react-router-dom';
 import { AmountField } from '../components/AmountField';
 import { BackButton, Dot, Sheet, useUi } from '../components/ui';
@@ -47,6 +48,41 @@ function CategorySheet({ category, suggested, onClose }: { category?: Category; 
   );
 }
 
+/** Set, change or turn off the PIN. Changing or turning off asks for the current PIN first. */
+function PinSheet({ mode, onClose }: { mode: 'set' | 'change' | 'off'; onClose: () => void }) {
+  const { toast } = useUi();
+  const [step, setStep] = useState<'current' | 'new' | 'confirm'>(mode === 'set' ? 'new' : 'current');
+  const [first, setFirst] = useState('');
+  const [error, setError] = useState<string>();
+
+  const title = { current: 'Enter your current PIN', new: mode === 'set' ? 'Choose a 4-digit PIN' : 'Choose a new PIN', confirm: 'Enter it again' }[step];
+
+  const done = async (pin: string) => {
+    setError(undefined);
+    if (step === 'current') {
+      if (!(await checkPin(pin))) return setError('Wrong PIN.');
+      if (mode === 'off') {
+        await removePin();
+        toast({ message: 'PIN turned off' });
+        return onClose();
+      }
+      return setStep('new');
+    }
+    if (step === 'new') { setFirst(pin); return setStep('confirm'); }
+    if (pin !== first) { setStep('new'); return setError("The PINs didn't match. Choose one again."); }
+    await setPin(pin);
+    toast({ message: mode === 'set' ? 'PIN set. Pocket will ask for it next time.' : 'PIN changed' });
+    onClose();
+  };
+
+  return (
+    <Sheet title={mode === 'off' ? 'Turn off PIN' : mode === 'change' ? 'Change PIN' : 'Set a PIN'} onClose={onClose}>
+      <p className="pin-step">{title}</p>
+      <PinPad key={step} onComplete={done} error={error} />
+    </Sheet>
+  );
+}
+
 export default function Settings() {
   const d = useAppData();
   const { confirm, toast } = useUi();
@@ -54,26 +90,10 @@ export default function Settings() {
   const [opening, setOpening] = useState<string | null>(null);
   const [openingError, setOpeningError] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
-  const [canLock, setCanLock] = useState<boolean | null>(null);
-  useEffect(() => { void lockAvailable().then(setCanLock); }, []);
+  const [pinFlow, setPinFlow] = useState<'set' | 'change' | 'off' | null>(null);
   if (!d.ready) return null;
 
-  const lockOn = !!d.settings.lockCredentialId;
-  const toggleLock = async () => {
-    if (lockOn) {
-      // Turning it off needs Face ID too, so someone else can't just switch it off.
-      if (!(await unlock(d.settings.lockCredentialId!))) return toast({ message: "Face ID didn't confirm, so the lock is still on." });
-      await updateSettings({ lockCredentialId: undefined });
-      return toast({ message: 'Face ID lock turned off' });
-    }
-    try {
-      const id = await createLock();
-      await updateSettings({ lockCredentialId: id });
-      toast({ message: 'Face ID lock turned on' });
-    } catch {
-      toast({ message: 'Face ID lock was not turned on.' });
-    }
-  };
+  const pinOn = !!d.settings.pinHash;
 
   const openingValue = opening ?? centsToInput(d.settings.openingBalanceCents);
 
@@ -188,20 +208,21 @@ export default function Settings() {
       </section>
 
       <section className="panel form">
-        <h2>Face ID lock</h2>
-        {canLock === false ? (
-          <p className="muted">Face ID isn't available here. Open Pocket from your home screen on your iPhone to use it.</p>
-        ) : (
-          <>
-            <p className="muted">{lockOn
-              ? 'Pocket asks for Face ID when you open it, and again after it has been in the background for a minute.'
-              : 'Ask for Face ID when opening Pocket. If Face ID fails, your phone passcode works instead.'}</p>
-            {!lockOn && !d.settings.lastBackupAt && <p className="hint">Save a backup first. If Face ID and your passcode ever both stop working, a backup is the only way back in.</p>}
-            <button className={`btn ${lockOn ? '' : 'primary'} start`} onClick={toggleLock} disabled={canLock === null}>
-              {lockOn ? 'Turn off Face ID lock' : 'Turn on Face ID lock'}
-            </button>
-          </>
-        )}
+        <h2>PIN lock</h2>
+        <p className="muted">{pinOn
+          ? 'Pocket asks for your 4-digit PIN when you open it, and again after a minute in the background.'
+          : 'Ask for a 4-digit PIN when opening Pocket.'}</p>
+        {!pinOn && !d.settings.lastBackupAt && <p className="hint">Save a backup first. If you forget your PIN, a backup is the only way back in.</p>}
+        <div className="row-actions start">
+          {pinOn ? (
+            <>
+              <button className="btn" onClick={() => setPinFlow('change')}>Change PIN</button>
+              <button className="btn ghost-danger" onClick={() => setPinFlow('off')}>Turn off PIN</button>
+            </>
+          ) : (
+            <button className="btn primary" onClick={() => setPinFlow('set')}>Set a PIN</button>
+          )}
+        </div>
       </section>
 
       <section className="panel form">
@@ -215,6 +236,7 @@ export default function Settings() {
         </div>
       </section>
 
+      {pinFlow && <PinSheet mode={pinFlow} onClose={() => setPinFlow(null)} />}
       {sheet && <CategorySheet category={sheet.category} suggested={freeSlot(list.map((c) => c.colorSlot))} onClose={() => setSheet(null)} />}
     </div>
   );

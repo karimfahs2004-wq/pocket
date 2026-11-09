@@ -15,7 +15,7 @@ import { db, newId } from './db';
 
 export async function saveTransaction(tx: Omit<Transaction, 'id'> & { id?: string }): Promise<string> {
   const id = tx.id ?? newId();
-  await db.transactions.put({ ...tx, id });
+  await db.transactions.put({ ...tx, id, createdAt: tx.createdAt ?? Date.now() });
   return id;
 }
 export const deleteTransaction = (id: string) => db.transactions.delete(id);
@@ -25,7 +25,7 @@ export const restoreTransaction = (tx: Transaction) => db.transactions.put(tx);
 
 export async function saveSavings(e: Omit<SavingsEntry, 'id'> & { id?: string }): Promise<string> {
   const id = e.id ?? newId();
-  await db.savings.put({ ...e, id });
+  await db.savings.put({ ...e, id, createdAt: e.createdAt ?? Date.now() });
   return id;
 }
 export const deleteSavings = (id: string) => db.savings.delete(id);

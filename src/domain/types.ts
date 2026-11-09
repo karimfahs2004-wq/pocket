@@ -11,6 +11,8 @@ export interface Transaction {
   categoryId: string;
   date: ISODate;
   notes?: string;
+  /** When it was added, so entries on the same day stay in the order you added them. */
+  createdAt?: number;
 }
 
 export interface Category {
@@ -48,6 +50,7 @@ export interface SavingsEntry {
   quantityMilli?: number;
   date: ISODate;
   notes?: string;
+  createdAt?: number;
 }
 
 export const OVERALL_BUDGET_ID = 'overall';
@@ -65,8 +68,9 @@ export interface Settings {
   salary?: Salary;
   /** The month whose summary was last dismissed. */
   summarySeenFor?: MonthKey;
-  /** Face ID lock: the id of this phone's passkey. Never included in backups. */
-  lockCredentialId?: string;
+  /** PIN lock: a salted hash of the PIN, never the PIN. Never included in backups. */
+  pinHash?: string;
+  pinSalt?: string;
   /** Old recurring payments, kept for reference after that feature was removed. */
   retiredRecurring?: unknown[];
 }

@@ -2,6 +2,7 @@ import Dexie from 'dexie';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { buildBackup, restoreBackup, validateBackup } from './backup';
 import { db } from './db';
+import { checkPin, clearOldFaceIdLock, removePin, setPin } from './pin';
 import {
   addCategory, deleteTransaction, getSettings, removeCategory, removeSalary, saveSalary,
   saveTransaction, syncSalary, updateSettings,
@@ -188,23 +189,42 @@ describe('backup', () => {
 });
 
 describe('savings storage', () => {
-  it('backs up savings, and never the Face ID passkey', async () => {
+  it('backs up savings, and never the PIN', async () => {
     await db.savings.add({ id: 's1', asset: 'gold', direction: 'in', amountCents: 50000, quantityMilli: 1000, date: '2026-11-01' });
-    await updateSettings({ lockCredentialId: 'phone-key' });
+    await setPin('1234');
     const backup = JSON.parse(JSON.stringify(await buildBackup()));
     expect(backup.version).toBe(3);
     expect(backup.data.savings).toHaveLength(1);
-    expect(backup.data.settings.lockCredentialId).toBeUndefined();
+    expect(backup.data.settings.pinHash).toBeUndefined();
+    expect(JSON.stringify(backup)).not.toContain('1234');
     await db.savings.clear();
     await restoreBackup(backup, '2026-11-04');
     expect(await db.savings.count()).toBe(1);
-    expect((await getSettings()).lockCredentialId).toBe('phone-key');
+    expect(await checkPin('1234')).toBe(true);
     await restoreBackup(backup, '2026-11-04', false);
-    expect((await getSettings()).lockCredentialId).toBeUndefined();
+    expect((await getSettings()).pinHash).toBeUndefined();
   });
   it('restores older backups without savings', async () => {
     const v2 = { app: 'pocket', version: 2, exportedAt: 'x', data: { transactions: [], categories: [], budgets: [], settings: { currency: 'USD', openingBalanceCents: 0 } } };
     await restoreBackup(v2, '2026-11-04');
     expect(await db.savings.count()).toBe(0);
+  });
+});
+
+describe('PIN', () => {
+  it('stores only a hash and checks it', async () => {
+    await setPin('4821');
+    const s = await getSettings();
+    expect(s.pinHash).toBeTruthy();
+    expect(JSON.stringify(s)).not.toContain('4821');
+    expect(await checkPin('4821')).toBe(true);
+    expect(await checkPin('4820')).toBe(false);
+    await removePin();
+    expect(await checkPin('4821')).toBe(false);
+  });
+  it('clears the old Face ID lock', async () => {
+    await db.settings.put({ key: 'lockCredentialId', value: 'old' });
+    await clearOldFaceIdLock();
+    expect(await db.settings.get('lockCredentialId')).toBeUndefined();
   });
 });
