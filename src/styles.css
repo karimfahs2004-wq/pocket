@@ -172,6 +172,14 @@ button { cursor: pointer; }
 .month-bar .link { flex: none; color: var(--muted); }
 .month-bar .edge:last-child { margin-right: -10px; }
 .month-bar .edge + .edge { margin-left: -6px; }
+.info-btn { display: inline-grid; place-items: center; width: 28px; height: 28px; margin: -6px 0 -6px 2px; padding: 0; border: 0; background: none; color: inherit; opacity: 0.75; vertical-align: middle; border-radius: 50%; }
+.info-btn[aria-expanded='true'] { opacity: 1; }
+.info-text { display: block; flex-basis: 100%; margin-top: 4px; font-size: 0.8125rem; line-height: 1.4; font-weight: 400; }
+.stat-label { flex-wrap: wrap; }
+.notice.near { background: var(--warning-bg); color: var(--warning-ink); font-weight: 600; }
+.notice.backup { align-items: center; }
+.notice.backup .btn { flex: none; }
+.day-head { display: flex; justify-content: space-between; gap: 12px; }
 .tiny { font-size: 0.75rem; line-height: 1.35; margin-top: 2px; }
 .budget { cursor: pointer; }
 .month-return { display: inline-flex; align-items: center; gap: 6px; justify-self: start; min-height: 36px; margin-top: -8px; padding: 4px 12px; border: 0; border-radius: 99px; background: var(--primary); color: var(--on-primary); font-weight: 600; font-size: 0.875rem; }

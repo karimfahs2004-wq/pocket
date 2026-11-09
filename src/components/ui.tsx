@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ArrowLeft, ChevronLeft, ChevronRight, CircleAlert, Settings as Gear, TriangleAlert, Undo2, X } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, CircleAlert, Info, Settings as Gear, TriangleAlert, Undo2, X } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { addMonthKey, formatMonth, monthOf, todayISO } from '../domain/dates';
 import type { Transaction, TxType } from '../domain/types';
@@ -37,6 +37,21 @@ export function Sheet({ title, onClose, children }: { title: string; onClose: ()
   );
 }
 
+/**
+ * iPhone only opens the keyboard when a field is focused during the tap itself. The form
+ * appears a moment later, so focus a hidden field now and the keyboard stays up when the
+ * real field takes over. Call it inside the tap handler that opens a form.
+ */
+export function primeKeyboard() {
+  const el = document.createElement('input');
+  el.setAttribute('aria-hidden', 'true');
+  el.tabIndex = -1;
+  el.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;font-size:16px;';
+  document.body.appendChild(el);
+  el.focus();
+  setTimeout(() => el.remove(), 1000);
+}
+
 // --- App-wide actions: add/edit transaction, confirm and toast
 
 interface ConfirmOptions { title: string; body: string; action: string }
@@ -44,6 +59,9 @@ interface ToastOptions { message: string; undo?: () => void }
 interface Ui {
   month: string;
   setMonth: (m: string) => void;
+  /** The last main tab you were on, so screens opened from it keep it highlighted. */
+  lastTab: string;
+  setLastTab: (t: string) => void;
   newTransaction: (type?: TxType) => void;
   editTransaction: (tx: Transaction) => void;
   confirm: (o: ConfirmOptions) => Promise<boolean>;
@@ -60,6 +78,7 @@ const sheetTitle = (f: { tx?: Transaction; type?: TxType }) => {
 
 export function UiProvider({ children }: { children: ReactNode }) {
   const [month, setMonth] = useState(monthOf(todayISO()));
+  const [lastTab, setLastTab] = useState('/');
   const [form, setForm] = useState<{ tx?: Transaction; type?: TxType; key: number } | null>(null);
   const [ask, setAsk] = useState<(ConfirmOptions & { resolve: (v: boolean) => void }) | null>(null);
   const [note, setNote] = useState<ToastOptions | null>(null);
@@ -68,17 +87,19 @@ export function UiProvider({ children }: { children: ReactNode }) {
   const toast = useCallback((o: ToastOptions) => {
     setNote(o);
     window.clearTimeout(timer.current);
-    timer.current = window.setTimeout(() => setNote(null), o.undo ? 6000 : 3000);
+    timer.current = window.setTimeout(() => setNote(null), o.undo ? 8000 : 3000);
   }, []);
 
   const ui = useMemo<Ui>(() => ({
     month,
     setMonth,
-    newTransaction: (type) => setForm({ type, key: Date.now() }),
+    lastTab,
+    setLastTab,
+    newTransaction: (type) => { primeKeyboard(); setForm({ type, key: Date.now() }); },
     editTransaction: (tx) => setForm({ tx, key: Date.now() }),
     confirm: (o) => new Promise((resolve) => setAsk({ ...o, resolve })),
     toast,
-  }), [toast, month]);
+  }), [toast, month, lastTab]);
 
   const answer = (v: boolean) => { ask?.resolve(v); setAsk(null); };
 
@@ -173,5 +194,19 @@ export function BackButton() {
   const back = () => (location.key !== 'default' ? navigate(-1) : navigate('/'));
   return (
     <button className="icon-btn" onClick={back} aria-label="Back"><ArrowLeft size={22} aria-hidden /></button>
+  );
+}
+
+/** A small ⓘ that reveals a short explanation, so it's there when needed without cluttering. */
+export function InfoTip({ label, children }: { label: string; children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button type="button" className="info-btn" aria-expanded={open} aria-label={`What is ${label}?`}
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen(!open); }}>
+        <Info size={15} aria-hidden />
+      </button>
+      {open && <span className="info-text">{children}</span>}
+    </>
   );
 }

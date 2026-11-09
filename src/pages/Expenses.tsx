@@ -59,7 +59,7 @@ export default function Expenses() {
             <Empty title="No matching expenses"><p className="muted">Search looks at names, categories and notes in every month.</p></Empty>
           ) : group(shown, (t) => monthOf(t.date)).map(([m, items]) => (
             <section key={m} className="day">
-              <h2 className="day-head">{formatMonth(m)}</h2>
+              <h2 className="day-head"><span>{formatMonth(m)}</span><span className="num">{d.money(items.reduce((x, t) => x + t.amountCents, 0))}</span></h2>
               <ul className="plain-list panel tight">
                 {items.map((t) => <TransactionRow key={t.id} tx={t} category={d.categoryById.get(t.categoryId)} money={d.money} />)}
               </ul>
@@ -76,7 +76,7 @@ export default function Expenses() {
             <Empty title="No expenses this month"><p className="muted">Tap + to add one.</p></Empty>
           ) : group(shown, (t) => t.date).map(([date, items]) => (
             <section key={date} className="day">
-              <h2 className="day-head">{formatDayFull(date)}</h2>
+              <h2 className="day-head"><span>{formatDayFull(date)}</span><span className="num">{d.money(items.reduce((x, t) => x + t.amountCents, 0))}</span></h2>
               <ul className="plain-list panel tight">
                 {items.map((t) => <TransactionRow key={t.id} tx={t} showDate={false} category={d.categoryById.get(t.categoryId)} money={d.money} />)}
               </ul>

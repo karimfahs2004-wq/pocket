@@ -2,7 +2,7 @@ import { Plus } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { AmountField } from '../components/AmountField';
 import { TransactionRow } from '../components/TransactionRow';
-import { BackButton, MonthPicker, Sheet, useUi } from '../components/ui';
+import { BackButton, MonthPicker, primeKeyboard, Sheet, useUi } from '../components/ui';
 import { useAppData } from '../data/hooks';
 import { removeSalary, saveSalary } from '../data/repo';
 import { formatDay, monthOf, todayISO } from '../domain/dates';
@@ -83,7 +83,7 @@ export default function Income() {
       <section className="panel">
         <div className="panel-head">
           <h2>Monthly salary</h2>
-          {salary && <button className="btn small" onClick={() => setEditing(true)}>Change</button>}
+          {salary && <button className="btn small" onClick={() => { primeKeyboard(); setEditing(true); }}>Change</button>}
         </div>
         {salary ? (
           <p><strong className="big-num">{d.money(salary.amountCents)}</strong><br />
@@ -91,7 +91,7 @@ export default function Income() {
         ) : (
           <>
             <p className="muted">Set it once and it's added on payday each month.</p>
-            <button className="btn primary start" onClick={() => setEditing(true)}>Set salary</button>
+            <button className="btn primary start" onClick={() => { primeKeyboard(); setEditing(true); }}>Set salary</button>
           </>
         )}
       </section>

@@ -3,10 +3,10 @@ import { useRef, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { AmountField } from '../components/AmountField';
 import { BackButton, Dot, Sheet, useUi } from '../components/ui';
-import { restoreBackup } from '../data/backup';
+import { buildBackup, restoreBackup } from '../data/backup';
 import { saveBackupFile } from '../data/saveBackup';
 import { useAppData } from '../data/hooks';
-import { addCategory, removeCategory, updateCategory, updateSettings } from '../data/repo';
+import { addCategory, removeCategory, restoreCategory, updateCategory, updateSettings } from '../data/repo';
 import { centsToInput, parseAmount } from '../domain/money';
 import type { Category } from '../domain/types';
 import { COLOR_SLOTS, freeSlot } from '../domain/colors';
@@ -82,13 +82,15 @@ export default function Settings() {
     }
     const yes = await confirm({
       title: 'Restore this backup?',
-      body: 'Everything currently in Pocket will be replaced by the backup.',
+      body: 'Everything currently in Pocket will be replaced by the backup. You can undo this right after.',
       action: 'Replace my data',
     });
     if (!yes) return;
     try {
+      // Keep what you had, so a wrong file can be undone.
+      const before = await buildBackup();
       const count = await restoreBackup(raw);
-      toast({ message: `Backup restored, ${count} transactions` });
+      toast({ message: `Backup restored, ${count} transactions`, undo: () => void restoreBackup(before) });
     } catch (err) {
       toast({ message: err instanceof Error ? err.message : 'The backup could not be restored.' });
     }
@@ -101,8 +103,9 @@ export default function Settings() {
       action: 'Delete',
     });
     if (!yes) return;
+    const budget = d.budgets.find((b) => b.id === c.id);
     await removeCategory(c.id);
-    toast({ message: `${c.name} deleted` });
+    toast({ message: `${c.name} deleted`, undo: () => void restoreCategory(c, budget) });
   };
 
   const list = d.categories.filter((c) => c.kind === 'expense' && !c.archived);

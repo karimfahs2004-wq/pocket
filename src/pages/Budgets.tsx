@@ -1,7 +1,7 @@
 import { Pencil, Plus } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { AmountField } from '../components/AmountField';
-import { Dot, Empty, LevelBadge, Meter, MonthPicker, Sheet, useUi } from '../components/ui';
+import { Dot, Empty, LevelBadge, Meter, MonthPicker, primeKeyboard, Sheet, useUi } from '../components/ui';
 import { useAppData } from '../data/hooks';
 import { removeBudget, setBudget } from '../data/repo';
 import { budgetStatus, type BudgetStatus } from '../domain/budget';
@@ -13,6 +13,7 @@ function BudgetSheet({ id, title, current, categories, onClose }: {
   id?: string; title: string; current?: number;
   categories?: { id: string; name: string }[]; onClose: () => void;
 }) {
+  const { toast } = useUi();
   const [amount, setAmount] = useState(current ? centsToInput(current) : '');
   const [chosen, setChosen] = useState(id ?? '');
   const [error, setError] = useState('');
@@ -22,6 +23,10 @@ function BudgetSheet({ id, title, current, categories, onClose }: {
     if (!cents) return setError('Enter an amount above 0, like 300.');
     if (!chosen) return setError('Choose a category.');
     await setBudget({ id: chosen, amountCents: cents });
+    toast({
+      message: 'Limit saved',
+      undo: () => void (current !== undefined ? setBudget({ id: chosen, amountCents: current }) : removeBudget(chosen)),
+    });
     onClose();
   };
   return (
@@ -39,7 +44,11 @@ function BudgetSheet({ id, title, current, categories, onClose }: {
         <AmountField label="Monthly limit" large autoFocus value={amount} onChange={setAmount} error={error} />
         <button className="btn primary wide">Save limit</button>
         {id && current !== undefined && (
-          <button type="button" className="btn ghost-danger wide" onClick={async () => { await removeBudget(id); onClose(); }}>Remove limit</button>
+          <button type="button" className="btn ghost-danger wide" onClick={async () => {
+            await removeBudget(id);
+            toast({ message: 'Limit removed', undo: () => void setBudget({ id, amountCents: current }) });
+            onClose();
+          }}>Remove limit</button>
         )}
       </form>
     </Sheet>
@@ -49,7 +58,8 @@ function BudgetSheet({ id, title, current, categories, onClose }: {
 export default function Budgets() {
   const d = useAppData();
   const { month } = useUi();
-  const [editing, setEditing] = useState<{ id?: string; title: string; current?: number; pick?: boolean } | null>(null);
+  const [editing, setEditingState] = useState<{ id?: string; title: string; current?: number; pick?: boolean } | null>(null);
+  const setEditing = (e: Parameters<typeof setEditingState>[0]) => { if (e) primeKeyboard(); setEditingState(e); };
   if (!d.ready) return null;
 
   const totals = monthTotals(d.transactions, month);

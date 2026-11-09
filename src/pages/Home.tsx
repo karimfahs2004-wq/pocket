@@ -1,8 +1,9 @@
 import { Link } from 'react-router-dom';
-import { ChevronRight, CircleAlert, CloudDownload } from 'lucide-react';
+import { ChevronRight, CircleAlert, CloudDownload, TriangleAlert } from 'lucide-react';
+import { budgetStatus } from '../domain/budget';
 import { saveBackupFile } from '../data/saveBackup';
 import { TransactionRow } from '../components/TransactionRow';
-import { MonthPicker, useUi } from '../components/ui';
+import { InfoTip, MonthPicker, useUi } from '../components/ui';
 import { useAppData } from '../data/hooks';
 import { formatDay, formatMonth, monthOf, todayISO } from '../domain/dates';
 import { nextPayday } from '../domain/salary';
@@ -32,8 +33,10 @@ export default function Home() {
     .slice(0, 5);
   const isNew = d.transactions.length === 0 && !salary;
 
-  const over = d.budgets.filter((b) =>
-    b.amountCents < (b.id === OVERALL_BUDGET_ID ? totals.expenseCents : spend.get(b.id) ?? 0));
+  const levels = d.budgets.map((b) =>
+    budgetStatus(b.id === OVERALL_BUDGET_ID ? totals.expenseCents : spend.get(b.id) ?? 0, b.amountCents).level);
+  const over = levels.filter((l) => l === 'over').length;
+  const near = levels.filter((l) => l === 'near').length;
   const backupDays = d.settings.lastBackupAt
     ? (Date.now() - new Date(d.settings.lastBackupAt).getTime()) / 86_400_000
     : Infinity;
@@ -44,20 +47,22 @@ export default function Home() {
       <MonthPicker />
 
       <section className="hero" aria-label="Money left">
-        <p className="hero-label">{left < 0 ? `Overspent ${label}` : `Left ${label}`}</p>
+        <p className="hero-label">{left < 0 ? `Overspent ${label}` : `Left ${label}`}
+          <InfoTip label="left this month">{isCurrent ? "This month's" : "That month's"} income minus its expenses. Earlier months don't count here.</InfoTip>
+        </p>
         <p className={`hero-value${left < 0 ? ' negative' : ''}`}>{d.money(Math.abs(left))}</p>
         <div className="hero-bar" role="img" aria-label={`${Math.round(usedRatio * 100)}% of income spent`}>
           <span style={{ width: `${Math.min(usedRatio, 1) * 100}%` }} />
         </div>
-        <p className="hero-note">{isCurrent ? "This month's" : 'That month\'s'} income minus its expenses</p>
         {payThisMonth && <p className="hero-note">Salary of {d.money(salary.amountCents)} expected on {formatDay(pay)}. It isn't counted until then.</p>}
       </section>
 
       <section className="stats" aria-label="Summary">
         <Link to="/income"><span className="muted stat-label">Income<ChevronRight size={14} aria-hidden /></span><strong>{d.money(totals.incomeCents)}</strong></Link>
         <Link to="/expenses"><span className="muted stat-label">Expenses<ChevronRight size={14} aria-hidden /></span><strong>{d.money(totals.expenseCents)}</strong></Link>
-        <div><span className="muted">Overall balance today</span><strong>{d.money(balance)}</strong>
-          <span className="muted tiny">Starting balance plus all income, minus all expenses, up to today</span></div>
+        <div><span className="muted stat-label">Overall balance today
+          <InfoTip label="overall balance">Your starting balance, plus all income, minus all expenses, up to today.</InfoTip></span>
+          <strong>{d.money(balance)}</strong></div>
       </section>
 
       {isNew && (
@@ -71,22 +76,22 @@ export default function Home() {
         </section>
       )}
 
-      {over.length > 0 && (
-        <Link to="/budget" className="notice over">
-          <CircleAlert size={18} aria-hidden />
-          <span className="grow">{over.length === 1 ? '1 budget is' : `${over.length} budgets are`} over the limit</span>
+      {(over > 0 || near > 0) && (
+        <Link to="/budget" className={`notice ${over ? 'over' : 'near'}`}>
+          {over ? <CircleAlert size={18} aria-hidden /> : <TriangleAlert size={18} aria-hidden />}
+          <span className="grow">{[over && `${over} over the limit`, near && `${near} near the limit`].filter(Boolean).join(', ')}</span>
           <ChevronRight size={18} aria-hidden />
         </Link>
       )}
 
       {d.transactions.length > 0 && backupDays > BACKUP_EVERY_DAYS && (
-        <section className="panel backup-prompt" aria-label="Backup">
-          <div className="line">
-            <CloudDownload size={20} aria-hidden />
-            <strong className="grow">{d.settings.lastBackupAt ? `Last backup was ${Math.floor(backupDays)} days ago` : 'Your data has no backup yet'}</strong>
-          </div>
-          <p className="muted small">Your data is stored only on this phone. If it's lost or reset, a backup is the only way to get it back.</p>
-          <button className="btn primary" onClick={async () => { if (await saveBackupFile()) toast({ message: 'Backup saved' }); }}>Save backup now</button>
+        <section className="notice backup" aria-label="Backup">
+          <CloudDownload size={18} aria-hidden />
+          <span className="grow">
+            <strong>{d.settings.lastBackupAt ? `Last backup ${Math.floor(backupDays)} days ago` : 'No backup yet'}</strong><br />
+            <span className="small">Your data is only on this phone.</span>
+          </span>
+          <button className="btn small primary" onClick={async () => { if (await saveBackupFile()) toast({ message: 'Backup saved' }); }}>Back up</button>
         </section>
       )}
 

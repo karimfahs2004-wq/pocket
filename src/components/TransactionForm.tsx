@@ -69,12 +69,14 @@ export function TransactionForm({ tx, initialType, onDone }: {
     if (Object.keys(next).length) return;
     // Category is optional: a skipped one is saved as Other (recreated if it was removed).
     const finalCategory = categoryId || (await addCategory('Other'));
-    await saveTransaction({
+    const id = await saveTransaction({
       ...tx, type, name: name.trim(), amountCents: cents!, categoryId: finalCategory, date,
       notes: notes.trim() || undefined,
     });
     const when = date === today || tx ? '' : ` for ${formatDay(date)}`;
-    toast({ message: tx ? 'Changes saved' : `${isExpense ? 'Expense' : 'Income'} added${when}` });
+    toast(tx
+      ? { message: 'Changes saved', undo: () => void restoreTransaction(tx) }
+      : { message: `${isExpense ? 'Expense' : 'Income'} added${when}`, undo: () => void deleteTransaction(id) });
     onDone();
   };
 

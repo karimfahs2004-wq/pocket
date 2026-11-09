@@ -12,8 +12,10 @@ import { db, newId } from './db';
 
 // --- Transactions
 
-export async function saveTransaction(tx: Omit<Transaction, 'id'> & { id?: string }) {
-  await db.transactions.put({ ...tx, id: tx.id ?? newId() });
+export async function saveTransaction(tx: Omit<Transaction, 'id'> & { id?: string }): Promise<string> {
+  const id = tx.id ?? newId();
+  await db.transactions.put({ ...tx, id });
+  return id;
 }
 export const deleteTransaction = (id: string) => db.transactions.delete(id);
 export const restoreTransaction = (tx: Transaction) => db.transactions.put(tx);
@@ -94,6 +96,14 @@ export async function fixCategoryColors() {
       .filter((c) => c.kind === 'expense' && !c.archived)
       .sort((x, y) => (uses.get(y.id) ?? 0) - (uses.get(x.id) ?? 0));
     for (const { id, colorSlot } of dedupeSlots(active)) await db.categories.update(id, { colorSlot });
+  });
+}
+
+/** Puts a deleted category (and its limit) back exactly as it was. */
+export async function restoreCategory(c: Category, budget?: Budget) {
+  await db.transaction('rw', db.categories, db.budgets, async () => {
+    await db.categories.put(c);
+    if (budget) await db.budgets.put(budget);
   });
 }
 
