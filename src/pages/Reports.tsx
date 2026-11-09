@@ -82,6 +82,7 @@ export default function Reports() {
         <h2>Spending by category</h2>
         {spend.length ? (
           <>
+            <p className="muted small">Tap a category to see its expenses.</p>
             <div className="donut">
               <ResponsiveContainer width="100%" height={210}>
                 <PieChart>

@@ -1,8 +1,8 @@
-import { ArrowLeft, ChevronRight, Download, Pencil, Plus, Trash2, Upload } from 'lucide-react';
+import { ChevronRight, Download, Pencil, Plus, Trash2, Upload } from 'lucide-react';
 import { useRef, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { AmountField } from '../components/AmountField';
-import { Dot, Sheet, useUi } from '../components/ui';
+import { BackButton, Dot, Sheet, useUi } from '../components/ui';
 import { restoreBackup } from '../data/backup';
 import { saveBackupFile } from '../data/saveBackup';
 import { useAppData } from '../data/hooks';
@@ -112,7 +112,7 @@ export default function Settings() {
     <div className="stack">
       <header className="page-head">
         <div className="line">
-          <Link to="/" className="icon-btn" aria-label="Back to Home"><ArrowLeft size={22} aria-hidden /></Link>
+          <BackButton />
           <h1>Settings</h1>
         </div>
       </header>

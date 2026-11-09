@@ -1,9 +1,8 @@
-import { ArrowLeft, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
-import { Link } from 'react-router-dom';
 import { AmountField } from '../components/AmountField';
 import { TransactionRow } from '../components/TransactionRow';
-import { MonthPicker, Sheet, useUi } from '../components/ui';
+import { BackButton, MonthPicker, Sheet, useUi } from '../components/ui';
 import { useAppData } from '../data/hooks';
 import { removeSalary, saveSalary } from '../data/repo';
 import { formatDay, monthOf, todayISO } from '../domain/dates';
@@ -76,7 +75,7 @@ export default function Income() {
     <div className="stack">
       <header className="page-head">
         <div className="line">
-          <Link to="/" className="icon-btn" aria-label="Back to Home"><ArrowLeft size={22} aria-hidden /></Link>
+          <BackButton />
           <h1>Income</h1>
         </div>
       </header>

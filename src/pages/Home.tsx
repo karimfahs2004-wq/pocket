@@ -49,13 +49,15 @@ export default function Home() {
         <div className="hero-bar" role="img" aria-label={`${Math.round(usedRatio * 100)}% of income spent`}>
           <span style={{ width: `${Math.min(usedRatio, 1) * 100}%` }} />
         </div>
+        <p className="hero-note">{isCurrent ? "This month's" : 'That month\'s'} income minus its expenses</p>
         {payThisMonth && <p className="hero-note">Salary of {d.money(salary.amountCents)} expected on {formatDay(pay)}. It isn't counted until then.</p>}
       </section>
 
       <section className="stats" aria-label="Summary">
         <Link to="/income"><span className="muted stat-label">Income<ChevronRight size={14} aria-hidden /></span><strong>{d.money(totals.incomeCents)}</strong></Link>
         <Link to="/expenses"><span className="muted stat-label">Expenses<ChevronRight size={14} aria-hidden /></span><strong>{d.money(totals.expenseCents)}</strong></Link>
-        <div><span className="muted">Overall balance today</span><strong>{d.money(balance)}</strong></div>
+        <div><span className="muted">Overall balance today</span><strong>{d.money(balance)}</strong>
+          <span className="muted tiny">Starting balance plus all income, minus all expenses, up to today</span></div>
       </section>
 
       {isNew && (

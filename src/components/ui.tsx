@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ChevronLeft, ChevronRight, CircleAlert, Settings as Gear, TriangleAlert, X } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { ArrowLeft, ChevronLeft, ChevronRight, CircleAlert, Settings as Gear, TriangleAlert, Undo2, X } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { addMonthKey, formatMonth, monthOf, todayISO } from '../domain/dates';
 import type { Transaction, TxType } from '../domain/types';
 import type { BudgetLevel } from '../domain/budget';
@@ -118,16 +118,22 @@ export function MonthPicker({ action, settings = true }: { action?: ReactNode; s
   const { month, setMonth } = useUi();
   const current = monthOf(todayISO());
   return (
+    <>
     <div className="month-bar">
       <div className="month-picker">
         <button className="icon-btn" onClick={() => setMonth(addMonthKey(month, -1))} aria-label="Previous month"><ChevronLeft size={22} aria-hidden /></button>
         <h1 aria-live="polite">{formatMonth(month)}</h1>
         <button className="icon-btn" onClick={() => setMonth(addMonthKey(month, 1))} aria-label="Next month"><ChevronRight size={22} aria-hidden /></button>
       </div>
-      {month !== current && <button className="link small" onClick={() => setMonth(current)}>This month</button>}
       {action}
       {settings && <Link to="/settings" className="icon-btn edge" aria-label="Settings"><Gear size={22} aria-hidden /></Link>}
     </div>
+    {month !== current && (
+      <button className="month-return" onClick={() => setMonth(current)}>
+        <Undo2 size={16} aria-hidden />Back to {formatMonth(current)}
+      </button>
+    )}
+    </>
   );
 }
 
@@ -157,5 +163,15 @@ export function Meter({ ratio, level }: { ratio: number; level: BudgetLevel }) {
     <div className={`meter ${level}`} role="img" aria-label={`${Math.round(ratio * 100)}% used`}>
       <span style={{ width: `${Math.min(ratio, 1) * 100}%` }} />
     </div>
+  );
+}
+
+/** Goes back to the screen you came from, or Home if the app was opened here. */
+export function BackButton() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const back = () => (location.key !== 'default' ? navigate(-1) : navigate('/'));
+  return (
+    <button className="icon-btn" onClick={back} aria-label="Back"><ArrowLeft size={22} aria-hidden /></button>
   );
 }
