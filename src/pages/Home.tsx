@@ -7,7 +7,10 @@ import { InfoTip, MonthPicker, useUi } from '../components/ui';
 import { useAppData } from '../data/hooks';
 import { formatDay, formatMonth, monthOf, todayISO } from '../domain/dates';
 import { nextPayday } from '../domain/salary';
-import { currentBalance, monthTotals, spendByCategory } from '../domain/reports';
+import { averageMonthlySpend, currentBalance, monthTotals, spendByCategory } from '../domain/reports';
+import { formatQuantity, holdings, savedInMonth, savedUpTo } from '../domain/savings';
+import { addMonthKey } from '../domain/dates';
+import { updateSettings } from '../data/repo';
 import { OVERALL_BUDGET_ID } from '../domain/types';
 
 /** How often to ask for a backup. */
@@ -15,16 +18,30 @@ const BACKUP_EVERY_DAYS = 14;
 
 export default function Home() {
   const d = useAppData();
-  const { month, toast } = useUi();
+  const { month, setMonth, toast } = useUi();
   if (!d.ready) return null;
 
   const today = todayISO();
   const isCurrent = month === monthOf(today);
   const totals = monthTotals(d.transactions, month);
   const spend = spendByCategory(d.transactions, month);
-  const left = totals.incomeCents - totals.expenseCents;
-  const balance = currentBalance(d.transactions, d.settings.openingBalanceCents, today);
-  const usedRatio = totals.incomeCents ? totals.expenseCents / totals.incomeCents : totals.expenseCents ? 1 : 0;
+  // Money saved or invested isn't spending, but it isn't free to spend either.
+  const saved = savedInMonth(d.savings, month);
+  const left = totals.incomeCents - totals.expenseCents - saved;
+  const balance = currentBalance(d.transactions, d.settings.openingBalanceCents, today) - savedUpTo(d.savings, today);
+  const out = totals.expenseCents + Math.max(saved, 0);
+  const usedRatio = totals.incomeCents ? out / totals.incomeCents : out ? 1 : 0;
+  const h = holdings(d.savings);
+  const metals = [h.gold.quantityMilli > 0 && formatQuantity(h.gold.quantityMilli, 'gold') + ' of gold', h.silver.quantityMilli > 0 && formatQuantity(h.silver.quantityMilli, 'silver') + ' of silver'].filter(Boolean).join(', ');
+
+  // Last month's review appears at the start of each month until you dismiss it.
+  const prev = addMonthKey(monthOf(today), -1);
+  const prevTotals = monthTotals(d.transactions, prev);
+  const prevSaved = savedInMonth(d.savings, prev);
+  const prevSpend = [...spendByCategory(d.transactions, prev).entries()].sort((a, b) => b[1] - a[1]);
+  const before = averageMonthlySpend(d.transactions.filter((t) => t.date < `${prev}-01`), addMonthKey(prev, -1));
+  const showSummary = isCurrent && (d.settings.summarySeenFor ?? '') < prev &&
+    (prevTotals.incomeCents > 0 || prevTotals.expenseCents > 0 || prevSaved !== 0);
   const salary = d.settings.salary;
   const pay = salary && nextPayday(salary, today);
   const payThisMonth = isCurrent && pay && monthOf(pay) === month;
@@ -48,7 +65,7 @@ export default function Home() {
 
       <section className="hero" aria-label="Money left">
         <p className="hero-label">{left < 0 ? `Overspent ${label}` : `Left ${label}`}
-          <InfoTip label="left this month">{isCurrent ? "This month's" : "That month's"} income minus its expenses. Earlier months don't count here.</InfoTip>
+          <InfoTip label="left this month">{isCurrent ? "This month's" : "That month's"} income, minus its expenses and what you saved or invested. Earlier months don't count here.</InfoTip>
         </p>
         <p className={`hero-value${left < 0 ? ' negative' : ''}`}>{d.money(Math.abs(left))}</p>
         <div className="hero-bar" role="img" aria-label={`${Math.round(usedRatio * 100)}% of income spent`}>
@@ -60,8 +77,10 @@ export default function Home() {
       <section className="stats" aria-label="Summary">
         <Link to="/income"><span className="muted stat-label">Income<ChevronRight size={14} aria-hidden /></span><strong>{d.money(totals.incomeCents)}</strong></Link>
         <Link to="/expenses"><span className="muted stat-label">Expenses<ChevronRight size={14} aria-hidden /></span><strong>{d.money(totals.expenseCents)}</strong></Link>
-        <div><span className="muted stat-label">Overall balance today
-          <InfoTip label="overall balance">Your starting balance, plus all income, minus all expenses, up to today.</InfoTip></span>
+        <Link to="/savings"><span className="muted stat-label">Saved {label}<ChevronRight size={14} aria-hidden /></span><strong>{d.money(saved)}</strong>
+          {metals && <span className="muted tiny">{metals}</span>}</Link>
+        <div><span className="muted stat-label">Balance today
+          <InfoTip label="balance today">Your starting balance, plus all income, minus all expenses and money moved to savings or investments, up to today.</InfoTip></span>
           <strong>{d.money(balance)}</strong></div>
       </section>
 
@@ -72,6 +91,26 @@ export default function Home() {
           <div className="row-actions">
             <Link className="btn primary" to="/income">Set salary</Link>
             <Link className="btn" to="/settings">Set starting balance</Link>
+          </div>
+        </section>
+      )}
+
+      {showSummary && (
+        <section className="panel summary" aria-label={`${formatMonth(prev)} in review`}>
+          <h2>{formatMonth(prev).split(' ')[0]} in review</h2>
+          <dl className="insights">
+            <div><dt>Spent</dt><dd>{d.money(prevTotals.expenseCents)}
+              {before.months > 0 && prevTotals.expenseCents !== before.cents && (
+                <small>{d.money(Math.abs(prevTotals.expenseCents - before.cents))} {prevTotals.expenseCents > before.cents ? 'more' : 'less'} than your average</small>
+              )}</dd></div>
+            {prevSpend[0] && <div><dt>Top category</dt><dd>{d.categoryById.get(prevSpend[0][0])?.name ?? 'Other'}, {d.money(prevSpend[0][1])}</dd></div>}
+            <div><dt>Income</dt><dd>{d.money(prevTotals.incomeCents)}</dd></div>
+            {prevSaved !== 0 && <div><dt>Saved & invested</dt><dd>{d.money(prevSaved)}</dd></div>}
+            <div><dt>Left at the end</dt><dd>{d.money(prevTotals.incomeCents - prevTotals.expenseCents - prevSaved)}</dd></div>
+          </dl>
+          <div className="row-actions start">
+            <button className="btn small primary" onClick={() => updateSettings({ summarySeenFor: prev })}>Got it</button>
+            <Link className="btn small" to="/reports" onClick={() => { setMonth(prev); void updateSettings({ summarySeenFor: prev }); }}>Open full report</Link>
           </div>
         </section>
       )}

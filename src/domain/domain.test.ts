@@ -1,3 +1,4 @@
+import { formatQuantity, holdings, parseQuantity, savedInMonth, savedUpTo } from './savings';
 import { dedupeSlots, freeSlot } from './colors';
 import { describe, expect, it } from 'vitest';
 import { budgetStatus } from './budget';
@@ -5,7 +6,7 @@ import { addMonthsClamped, isValidDate, todayISO } from './dates';
 import { formatMoney, parseAmount } from './money';
 import { monthsDue, nextPayday, paydayIn } from './salary';
 import { averageMonthlySpend, currentBalance, monthTotals, monthlySeries, spendByCategory } from './reports';
-import type { Transaction } from './types';
+import type { SavingsEntry, Transaction } from './types';
 
 const tx = (o: Partial<Transaction>): Transaction => ({
   id: Math.random().toString(), type: 'expense', name: 'x', amountCents: 100,
@@ -94,5 +95,37 @@ describe('category colours', () => {
     const cats = [{ id: 'food', colorSlot: 0 }, { id: 'gym', colorSlot: 2 }, { id: 'pets', colorSlot: 0 }];
     expect(dedupeSlots(cats)).toEqual([{ id: 'pets', colorSlot: 1 }]);
     expect(dedupeSlots([{ id: 'a', colorSlot: 3 }])).toEqual([]);
+  });
+});
+
+describe('savings and investments', () => {
+  const e = (o: object) => ({ id: Math.random().toString(), asset: 'cash', direction: 'in', amountCents: 10000, date: '2026-11-05', ...o }) as SavingsEntry;
+  const list = [
+    e({}),
+    e({ direction: 'out', amountCents: 2500, date: '2026-11-20' }),
+    e({ asset: 'gold', amountCents: 50000, quantityMilli: 2000, date: '2026-10-01' }),
+    e({ asset: 'silver', amountCents: 6000, quantityMilli: 2500, date: '2026-11-02' }),
+    e({ asset: 'silver', direction: 'out', amountCents: 2600, quantityMilli: 1000, date: '2026-11-03' }),
+  ];
+  it('nets money per month and up to today', () => {
+    expect(savedInMonth(list, '2026-11')).toBe(10000 - 2500 + 6000 - 2600);
+    expect(savedInMonth(list, '2026-10')).toBe(50000);
+    expect(savedUpTo(list, '2026-11-10')).toBe(50000 + 10000 + 6000 - 2600);
+  });
+  it('counts holdings', () => {
+    const h = holdings(list);
+    expect(h.cash.cents).toBe(7500);
+    expect(h.gold.quantityMilli).toBe(2000);
+    expect(h.silver.quantityMilli).toBe(1500);
+    expect(formatQuantity(h.silver.quantityMilli, 'silver')).toBe('1.5 oz');
+    expect(formatQuantity(1000, 'gold')).toBe('1 coin');
+  });
+  it('reads quantities', () => {
+    expect(parseQuantity('2', true)).toBe(2000);
+    expect(parseQuantity('1.5', true)).toBeNull();
+    expect(parseQuantity('0.5', false)).toBe(500);
+    expect(parseQuantity('1,25', false)).toBe(1250);
+    expect(parseQuantity('0', false)).toBeNull();
+    expect(parseQuantity('1.2345', false)).toBeNull();
   });
 });

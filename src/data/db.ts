@@ -1,7 +1,7 @@
 import Dexie, { type EntityTable } from 'dexie';
 import { todayISO } from '../domain/dates';
 import { migrateLegacy, type LegacyRule, type LegacyTransaction } from '../domain/legacy';
-import type { Budget, Category, Transaction } from '../domain/types';
+import type { Budget, Category, SavingsEntry, Transaction } from '../domain/types';
 
 export interface SettingRow {
   key: string;
@@ -29,6 +29,7 @@ export const db = new Dexie('pocket') as Dexie & {
   transactions: EntityTable<Transaction, 'id'>;
   categories: EntityTable<Category, 'id'>;
   budgets: EntityTable<Budget, 'id'>;
+  savings: EntityTable<SavingsEntry, 'id'>;
   settings: EntityTable<SettingRow, 'key'>;
 };
 
@@ -41,7 +42,7 @@ db.version(1).stores({
 });
 
 // Version 2 removes recurring payments. Every transaction is kept, and a monthly
-// salary rule becomes the new salary setting. Add db.version(3) for future changes.
+// salary rule becomes the new salary setting. Add a new version below for future changes.
 db.version(2)
   .stores({ transactions: 'id, date, categoryId', recurring: null })
   .upgrade(async (tx) => {
@@ -56,6 +57,9 @@ db.version(2)
     if (salary) await tx.table('settings').put({ key: 'salary', value: salary });
     if (retired.length) await tx.table('settings').put({ key: 'retiredRecurring', value: retired });
   });
+
+// Version 3 adds savings and investments. Nothing existing changes.
+db.version(3).stores({ savings: 'id, date, asset' });
 
 db.on('populate', (tx) => {
   tx.table('categories').bulkAdd(DEFAULT_CATEGORIES);

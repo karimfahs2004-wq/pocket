@@ -1,5 +1,6 @@
 import { ChevronRight, Download, Pencil, Plus, Trash2, Upload } from 'lucide-react';
-import { useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { createLock, lockAvailable, unlock } from '../data/lock';
 import { Link } from 'react-router-dom';
 import { AmountField } from '../components/AmountField';
 import { BackButton, Dot, Sheet, useUi } from '../components/ui';
@@ -53,7 +54,26 @@ export default function Settings() {
   const [opening, setOpening] = useState<string | null>(null);
   const [openingError, setOpeningError] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
+  const [canLock, setCanLock] = useState<boolean | null>(null);
+  useEffect(() => { void lockAvailable().then(setCanLock); }, []);
   if (!d.ready) return null;
+
+  const lockOn = !!d.settings.lockCredentialId;
+  const toggleLock = async () => {
+    if (lockOn) {
+      // Turning it off needs Face ID too, so someone else can't just switch it off.
+      if (!(await unlock(d.settings.lockCredentialId!))) return toast({ message: "Face ID didn't confirm, so the lock is still on." });
+      await updateSettings({ lockCredentialId: undefined });
+      return toast({ message: 'Face ID lock turned off' });
+    }
+    try {
+      const id = await createLock();
+      await updateSettings({ lockCredentialId: id });
+      toast({ message: 'Face ID lock turned on' });
+    } catch {
+      toast({ message: 'Face ID lock was not turned on.' });
+    }
+  };
 
   const openingValue = opening ?? centsToInput(d.settings.openingBalanceCents);
 
@@ -120,6 +140,13 @@ export default function Settings() {
         </div>
       </header>
 
+      <Link to="/savings" className="panel link-row">
+        <span className="grow"><strong>Savings & investments</strong><br />
+          <span className="muted small">Cash savings, gold coins and silver ounces</span>
+        </span>
+        <ChevronRight size={20} aria-hidden />
+      </Link>
+
       <Link to="/income" className="panel link-row">
         <span className="grow"><strong>Salary and income</strong><br />
           <span className="muted small">{d.settings.salary ? `${d.money(d.settings.salary.amountCents)} a month, paid on day ${d.settings.salary.payDay}` : 'Set your salary or add other income'}</span>
@@ -158,6 +185,23 @@ export default function Settings() {
             </li>
           ))}
         </ul>
+      </section>
+
+      <section className="panel form">
+        <h2>Face ID lock</h2>
+        {canLock === false ? (
+          <p className="muted">Face ID isn't available here. Open Pocket from your home screen on your iPhone to use it.</p>
+        ) : (
+          <>
+            <p className="muted">{lockOn
+              ? 'Pocket asks for Face ID when you open it, and again after it has been in the background for a minute.'
+              : 'Ask for Face ID when opening Pocket. If Face ID fails, your phone passcode works instead.'}</p>
+            {!lockOn && !d.settings.lastBackupAt && <p className="hint">Save a backup first. If Face ID and your passcode ever both stop working, a backup is the only way back in.</p>}
+            <button className={`btn ${lockOn ? '' : 'primary'} start`} onClick={toggleLock} disabled={canLock === null}>
+              {lockOn ? 'Turn off Face ID lock' : 'Turn on Face ID lock'}
+            </button>
+          </>
+        )}
       </section>
 
       <section className="panel form">

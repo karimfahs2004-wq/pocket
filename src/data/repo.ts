@@ -5,6 +5,7 @@ import {
   DEFAULT_SETTINGS,
   type Budget,
   type Category,
+  type SavingsEntry,
   type Settings,
   type Transaction,
 } from '../domain/types';
@@ -19,6 +20,16 @@ export async function saveTransaction(tx: Omit<Transaction, 'id'> & { id?: strin
 }
 export const deleteTransaction = (id: string) => db.transactions.delete(id);
 export const restoreTransaction = (tx: Transaction) => db.transactions.put(tx);
+
+// --- Savings and investments
+
+export async function saveSavings(e: Omit<SavingsEntry, 'id'> & { id?: string }): Promise<string> {
+  const id = e.id ?? newId();
+  await db.savings.put({ ...e, id });
+  return id;
+}
+export const deleteSavings = (id: string) => db.savings.delete(id);
+export const restoreSavings = (e: SavingsEntry) => db.savings.put(e);
 
 // --- Salary
 

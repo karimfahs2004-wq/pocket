@@ -3,11 +3,13 @@ import { NavLink, Route, Routes, useLocation } from 'react-router-dom';
 import { ChartColumn, House, Plus, Receipt, Target, type LucideIcon } from 'lucide-react';
 import { fixCategoryColors, syncSalary } from './data/repo';
 import { UiProvider, useUi } from './components/ui';
+import { LockGate } from './components/LockGate';
 import Home from './pages/Home';
 import Expenses from './pages/Expenses';
 import Budgets from './pages/Budgets';
 import Income from './pages/Income';
 import Settings from './pages/Settings';
+import Savings from './pages/Savings';
 
 // Charts are the heaviest part of the app, so they load only when opened.
 const Reports = lazy(() => import('./pages/Reports'));
@@ -51,6 +53,7 @@ function Shell() {
             <Route path="/reports" element={<Reports />} />
             <Route path="/income" element={<Income />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/savings" element={<Savings />} />
             <Route path="*" element={<Home />} />
           </Routes>
         </Suspense>
@@ -73,8 +76,10 @@ export default function App() {
   }, []);
 
   return (
-    <UiProvider>
-      <Shell />
-    </UiProvider>
+    <LockGate>
+      <UiProvider>
+        <Shell />
+      </UiProvider>
+    </LockGate>
   );
 }

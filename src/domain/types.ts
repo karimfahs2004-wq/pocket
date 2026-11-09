@@ -31,6 +31,25 @@ export interface Salary {
   lastPaidMonth: MonthKey;
 }
 
+export type Asset = 'cash' | 'gold' | 'silver';
+
+/**
+ * Money set aside or invested. It isn't spending, so budgets and expense reports ignore it,
+ * but it does leave your spending money: "in" lowers what's left, "out" adds it back.
+ */
+export interface SavingsEntry {
+  id: string;
+  asset: Asset;
+  /** in: put into savings or bought. out: taken out or sold. */
+  direction: 'in' | 'out';
+  /** Money moved: amount saved, price paid, or amount received. */
+  amountCents: number;
+  /** Gold coins or silver ounces, in thousandths so 0.5 oz is exact. Cash has none. */
+  quantityMilli?: number;
+  date: ISODate;
+  notes?: string;
+}
+
 export const OVERALL_BUDGET_ID = 'overall';
 
 export interface Budget {
@@ -44,6 +63,10 @@ export interface Settings {
   openingBalanceCents: number;
   lastBackupAt?: string;
   salary?: Salary;
+  /** The month whose summary was last dismissed. */
+  summarySeenFor?: MonthKey;
+  /** Face ID lock: the id of this phone's passkey. Never included in backups. */
+  lockCredentialId?: string;
   /** Old recurring payments, kept for reference after that feature was removed. */
   retiredRecurring?: unknown[];
 }

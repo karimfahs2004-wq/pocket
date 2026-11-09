@@ -1,0 +1,171 @@
+import { Pencil, Plus } from 'lucide-react';
+import { useState, type FormEvent } from 'react';
+import { AmountField } from '../components/AmountField';
+import { BackButton, primeKeyboard, Sheet, useUi } from '../components/ui';
+import { useAppData } from '../data/hooks';
+import { deleteSavings, restoreSavings, saveSavings } from '../data/repo';
+import { formatDay, todayISO } from '../domain/dates';
+import { centsToInput, parseAmount } from '../domain/money';
+import { formatQuantity, holdings, parseQuantity } from '../domain/savings';
+import type { Asset, SavingsEntry } from '../domain/types';
+
+const NAMES: Record<Asset, string> = { cash: 'Cash savings', gold: 'Gold', silver: 'Silver' };
+
+/** What each action is called, so buttons, titles and messages always match. */
+function verb(asset: Asset, direction: 'in' | 'out') {
+  if (asset === 'cash') return direction === 'in' ? 'Add to savings' : 'Take out';
+  return `${direction === 'in' ? 'Buy' : 'Sell'} ${asset}`;
+}
+
+function EntrySheet({ asset, direction, entry, onClose }: {
+  asset: Asset; direction: 'in' | 'out'; entry?: SavingsEntry; onClose: () => void;
+}) {
+  const d = useAppData();
+  const { toast } = useUi();
+  const metal = asset !== 'cash';
+  const unit = asset === 'gold' ? 'coins' : 'ounces';
+  const [qty, setQty] = useState(entry?.quantityMilli ? String(entry.quantityMilli / 1000) : '');
+  const [amount, setAmount] = useState(entry ? centsToInput(entry.amountCents) : '');
+  const [date, setDate] = useState(entry?.date ?? todayISO());
+  const [notes, setNotes] = useState(entry?.notes ?? '');
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // You can't sell or take out more than you have (an edited entry's own amount counts as yours).
+  const others = d.savings.filter((e) => e.id !== entry?.id);
+  const have = holdings(others)[asset];
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    const cents = parseAmount(amount);
+    const milli = metal ? parseQuantity(qty, asset === 'gold') : undefined;
+    const next: Record<string, string> = {};
+    if (metal && !milli) next.qty = asset === 'gold' ? 'Enter a whole number of coins, like 1.' : 'Enter ounces, like 1 or 0.5.';
+    if (!cents) next.amount = 'Enter an amount above 0.';
+    if (direction === 'out' && metal && milli && milli > have.quantityMilli) next.qty = `You have ${formatQuantity(have.quantityMilli, asset)}.`;
+    if (direction === 'out' && !metal && cents && cents > have.cents) next.amount = `You have ${d.money(have.cents)} in savings.`;
+    if (!date) next.date = 'Choose a date.';
+    setErrors(next);
+    if (Object.keys(next).length) return;
+    const id = await saveSavings({
+      ...entry, asset, direction, amountCents: cents!, date, notes: notes.trim() || undefined,
+      ...(metal ? { quantityMilli: milli! } : {}),
+    });
+    toast(entry
+      ? { message: 'Changes saved', undo: () => void restoreSavings(entry) }
+      : { message: 'Saved', undo: () => void deleteSavings(id) });
+    onClose();
+  };
+
+  const remove = async () => {
+    await deleteSavings(entry!.id);
+    toast({ message: 'Entry deleted', undo: () => void restoreSavings(entry!) });
+    onClose();
+  };
+
+  const amountLabel = asset === 'cash' ? 'Amount' : direction === 'in' ? 'Total price paid' : 'Total amount received';
+
+  return (
+    <Sheet title={entry ? `Edit: ${verb(asset, direction).toLowerCase()}` : verb(asset, direction)} onClose={onClose}>
+      <form className="form" onSubmit={submit} noValidate>
+        {metal && (
+          <div className="field">
+            <label htmlFor="sv-qty">How many {unit}</label>
+            <input id="sv-qty" inputMode="decimal" autoComplete="off" value={qty} onChange={(e) => setQty(e.target.value)}
+              autoFocus={!entry} data-autofocus={!entry || undefined} aria-invalid={!!errors.qty} placeholder={asset === 'gold' ? '1' : '1 or 0.5'} />
+            {errors.qty && <p className="error">{errors.qty}</p>}
+            {direction === 'out' && <p className="hint">You have {formatQuantity(have.quantityMilli, asset)}.</p>}
+          </div>
+        )}
+        <AmountField label={amountLabel} large={!metal} autoFocus={!metal && !entry} value={amount} onChange={setAmount} error={errors.amount} />
+        <div className="field">
+          <label htmlFor="sv-date">Date</label>
+          <input id="sv-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} aria-invalid={!!errors.date} />
+          {errors.date && <p className="error">{errors.date}</p>}
+        </div>
+        <div className="field">
+          <label htmlFor="sv-notes">Notes (optional)</label>
+          <input id="sv-notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={metal ? 'Shop, coin type' : ''} />
+        </div>
+        <p className="hint">
+          {direction === 'in'
+            ? 'This moves money out of what you have left to spend. It is not counted as an expense.'
+            : 'This adds the money back to what you have left to spend.'}
+        </p>
+        <div className="sheet-actions">
+          <button className="btn primary wide">{entry ? 'Save changes' : verb(asset, direction)}</button>
+          {entry && <button type="button" className="btn ghost-danger wide" onClick={remove}>Delete entry</button>}
+        </div>
+      </form>
+    </Sheet>
+  );
+}
+
+export default function Savings() {
+  const d = useAppData();
+  const [sheet, setSheet] = useState<{ asset: Asset; direction: 'in' | 'out'; entry?: SavingsEntry } | null>(null);
+  if (!d.ready) return null;
+
+  const h = holdings(d.savings);
+  const open = (s: NonNullable<typeof sheet>) => { if (!s.entry) primeKeyboard(); setSheet(s); };
+
+  const Card = ({ asset }: { asset: Asset }) => {
+    const x = h[asset];
+    const has = asset === 'cash' ? x.cents > 0 : x.quantityMilli > 0;
+    return (
+      <section className="panel asset">
+        <div className="asset-head">
+          <span className={`asset-mark ${asset}`} aria-hidden />
+          <h2 className="grow">{NAMES[asset]}</h2>
+        </div>
+        <p className="asset-value">{asset === 'cash' ? d.money(x.cents) : formatQuantity(x.quantityMilli, asset)}</p>
+        {asset !== 'cash' && <p className="muted small">{has ? `${d.money(Math.max(x.cents, 0))} paid for what you hold` : 'None yet'}</p>}
+        <div className="row-actions start">
+          <button className="btn small primary" onClick={() => open({ asset, direction: 'in' })}><Plus size={15} aria-hidden />{asset === 'cash' ? 'Add' : 'Buy'}</button>
+          {has && <button className="btn small" onClick={() => open({ asset, direction: 'out' })}>{asset === 'cash' ? 'Take out' : 'Sell'}</button>}
+        </div>
+      </section>
+    );
+  };
+
+  return (
+    <div className="stack">
+      <header className="page-head">
+        <div className="line">
+          <BackButton />
+          <h1>Savings & investments</h1>
+        </div>
+      </header>
+
+      <Card asset="cash" />
+      <div className="asset-pair">
+        <Card asset="gold" />
+        <Card asset="silver" />
+      </div>
+
+      <section className="panel">
+        <h2>History</h2>
+        {d.savings.length ? (
+          <ul className="plain-list">
+            {d.savings.map((e) => (
+              <li key={e.id} className="tx-item">
+                <button className="tx-row" tabIndex={-1} aria-hidden onClick={() => setSheet({ asset: e.asset, direction: e.direction, entry: e })}>
+                  <span className={`asset-mark small ${e.asset}`} />
+                  <span className="tx-main">
+                    <span className="tx-name">{verb(e.asset, e.direction)}{e.quantityMilli ? `, ${formatQuantity(e.quantityMilli, e.asset)}` : ''}</span>
+                    <span className="tx-meta">{formatDay(e.date)}{e.notes ? `, ${e.notes}` : ''}</span>
+                  </span>
+                  <span className="tx-amount num">{e.direction === 'in' ? '' : '+'}{d.money(e.amountCents)}</span>
+                </button>
+                <button className="icon-btn tx-edit" onClick={() => setSheet({ asset: e.asset, direction: e.direction, entry: e })} aria-label={`Edit ${verb(e.asset, e.direction)}, ${formatDay(e.date)}`}>
+                  <Pencil size={18} aria-hidden />
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : <p className="muted">Nothing yet. Use Add or Buy above to start.</p>}
+      </section>
+
+      {sheet && <EntrySheet key={sheet.entry?.id ?? sheet.asset + sheet.direction} {...sheet} onClose={() => setSheet(null)} />}
+    </div>
+  );
+}

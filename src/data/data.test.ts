@@ -186,3 +186,25 @@ describe('backup', () => {
     expect(await db.transactions.count()).toBe(1);
   });
 });
+
+describe('savings storage', () => {
+  it('backs up savings, and never the Face ID passkey', async () => {
+    await db.savings.add({ id: 's1', asset: 'gold', direction: 'in', amountCents: 50000, quantityMilli: 1000, date: '2026-11-01' });
+    await updateSettings({ lockCredentialId: 'phone-key' });
+    const backup = JSON.parse(JSON.stringify(await buildBackup()));
+    expect(backup.version).toBe(3);
+    expect(backup.data.savings).toHaveLength(1);
+    expect(backup.data.settings.lockCredentialId).toBeUndefined();
+    await db.savings.clear();
+    await restoreBackup(backup, '2026-11-04');
+    expect(await db.savings.count()).toBe(1);
+    expect((await getSettings()).lockCredentialId).toBe('phone-key');
+    await restoreBackup(backup, '2026-11-04', false);
+    expect((await getSettings()).lockCredentialId).toBeUndefined();
+  });
+  it('restores older backups without savings', async () => {
+    const v2 = { app: 'pocket', version: 2, exportedAt: 'x', data: { transactions: [], categories: [], budgets: [], settings: { currency: 'USD', openingBalanceCents: 0 } } };
+    await restoreBackup(v2, '2026-11-04');
+    expect(await db.savings.count()).toBe(0);
+  });
+});

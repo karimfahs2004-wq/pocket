@@ -12,18 +12,20 @@ export function useAppData() {
     (await db.categories.toArray()).sort((a, b) => a.name.localeCompare(b.name)),
   );
   const budgets = useLiveQuery(() => db.budgets.toArray());
+  const savings = useLiveQuery(() => db.savings.orderBy('date').reverse().toArray());
   const settings = useLiveQuery(getSettings);
 
   return useMemo(() => {
     const cur = settings ?? DEFAULT_SETTINGS;
     return {
-      ready: !!(transactions && categories && budgets && settings),
+      ready: !!(transactions && categories && budgets && savings && settings),
       transactions: transactions ?? [],
       categories: categories ?? [],
       categoryById: new Map((categories ?? []).map((c) => [c.id, c])),
       budgets: budgets ?? [],
+      savings: savings ?? [],
       settings: cur,
       money: (cents: number) => formatMoney(cents, cur.currency),
     };
-  }, [transactions, categories, budgets, settings]);
+  }, [transactions, categories, budgets, savings, settings]);
 }
