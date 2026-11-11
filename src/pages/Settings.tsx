@@ -3,13 +3,11 @@ import { useRef, useState, type FormEvent } from 'react';
 import { checkPin, removePin, setPin } from '../data/pin';
 import { PinPad } from '../components/PinPad';
 import { Link } from 'react-router-dom';
-import { AmountField } from '../components/AmountField';
 import { BackButton, Dot, Sheet, useUi } from '../components/ui';
 import { buildBackup, restoreBackup } from '../data/backup';
 import { saveBackupFile } from '../data/saveBackup';
 import { useAppData } from '../data/hooks';
 import { addCategory, removeCategory, restoreCategory, updateCategory, updateSettings } from '../data/repo';
-import { centsToInput, parseAmount } from '../domain/money';
 import type { Category } from '../domain/types';
 import { COLOR_SLOTS, freeSlot } from '../domain/colors';
 
@@ -87,25 +85,11 @@ export default function Settings() {
   const d = useAppData();
   const { confirm, toast } = useUi();
   const [sheet, setSheet] = useState<{ category?: Category } | null>(null);
-  const [opening, setOpening] = useState<string | null>(null);
-  const [openingError, setOpeningError] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
   const [pinFlow, setPinFlow] = useState<'set' | 'change' | 'off' | null>(null);
   if (!d.ready) return null;
 
   const pinOn = !!d.settings.pinHash;
-
-  const openingValue = opening ?? centsToInput(d.settings.openingBalanceCents);
-
-  const saveOpening = async (e: FormEvent) => {
-    e.preventDefault();
-    const cents = parseAmount(openingValue || '0', true);
-    if (cents === null) return setOpeningError('Enter an amount, like 500 or -50.');
-    setOpeningError('');
-    await updateSettings({ openingBalanceCents: cents });
-    setOpening(null);
-    toast({ message: 'Starting balance saved' });
-  };
 
   const download = async () => {
     if (await saveBackupFile()) toast({ message: 'Backup saved' });
@@ -160,29 +144,17 @@ export default function Settings() {
         </div>
       </header>
 
-      <Link to="/savings" className="panel link-row">
-        <span className="grow"><strong>Savings & investments</strong><br />
-          <span className="muted small">Cash savings, gold coins and silver ounces</span>
-        </span>
-        <ChevronRight size={20} aria-hidden />
-      </Link>
-
-      <Link to="/income" className="panel link-row">
-        <span className="grow"><strong>Salary and income</strong><br />
-          <span className="muted small">{d.settings.salary ? `${d.money(d.settings.salary.amountCents)} a month, paid on day ${d.settings.salary.payDay}` : 'Set your salary or add other income'}</span>
+      <Link to="/money" className="panel link-row">
+        <span className="grow"><strong>My money</strong><br />
+          <span className="muted small">Cash, savings, gold and silver, income, starting cash</span>
         </span>
         <ChevronRight size={20} aria-hidden />
       </Link>
 
       <section className="panel form">
-        <h2>Money</h2>
-        <form onSubmit={saveOpening} className="form" noValidate>
-          <AmountField label="Starting balance" allowNegative value={openingValue} onChange={setOpening} error={openingError} />
-          <p className="hint">What you had before you started using Pocket. Your overall balance starts from this, then adds income and subtracts expenses.</p>
-          {opening !== null && <button className="btn primary">Save starting balance</button>}
-        </form>
+        <h2>Currency</h2>
         <div className="field">
-          <label htmlFor="s-cur">Currency</label>
+          <label htmlFor="s-cur">Currency symbol</label>
           <select id="s-cur" value={d.settings.currency} onChange={(e) => updateSettings({ currency: e.target.value })}>
             {CURRENCIES.map((c) => <option key={c}>{c}</option>)}
           </select>

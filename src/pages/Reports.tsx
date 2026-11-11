@@ -5,7 +5,6 @@ import { Dot, Empty, MonthPicker, useUi } from '../components/ui';
 import { useAppData } from '../data/hooks';
 import { addMonthKey, formatMonth, formatMonthShort, monthOf, todayISO } from '../domain/dates';
 import { averageMonthlySpend, monthTotals, monthlySeries, spendByCategory } from '../domain/reports';
-import { savedInMonth } from '../domain/savings';
 
 const WINDOW = 6;
 const axis = { fontSize: 12, fill: 'var(--muted)' };
@@ -39,8 +38,7 @@ export default function Reports() {
 
   const name = (id: string) => d.categoryById.get(id)?.name ?? 'Uncategorized';
   const slot = (id: string) => d.categoryById.get(id)?.colorSlot ?? 6;
-  const totals = monthTotals(d.transactions, month);
-  const total = totals.expenseCents;
+  const total = monthTotals(d.transactions, month).expenseCents;
   const spend = [...spendByCategory(d.transactions, month).entries()]
     .sort((a, b) => b[1] - a[1])
     .map(([id, cents]) => ({ id, name: name(id), cents, pct: total ? (cents / total) * 100 : 0 }));
@@ -63,14 +61,12 @@ export default function Reports() {
       <section className="panel" aria-label="Insights">
         <h2>Insights</h2>
         <dl className="insights">
-          <div><dt>Total expenses</dt><dd>{d.money(total)}</dd></div>
-          <div><dt>Highest category</dt><dd>{spend[0] ? `${spend[0].name}, ${d.money(spend[0].cents)}` : 'None yet'}</dd></div>
+          <div><dt>Spent</dt><dd>{d.money(total)}</dd></div>
+          <div><dt>Top category</dt><dd>{spend[0] ? `${spend[0].name}, ${d.money(spend[0].cents)}` : 'None yet'}</dd></div>
           <div>
             <dt>Average per month</dt>
             <dd>{avg.months ? d.money(avg.cents) : 'None yet'}{avg.months > 0 && <small>{avg.months} {avg.months === 1 ? 'month' : 'months'} with expenses</small>}</dd>
           </div>
-          {savedInMonth(d.savings, month) !== 0 && <div><dt>Saved & invested</dt><dd>{d.money(savedInMonth(d.savings, month))}</dd></div>}
-          <div><dt>Income spent</dt><dd>{totals.incomeCents ? `${Math.round((total / totals.incomeCents) * 100)}%` : 'No income this month'}</dd></div>
           <div>
             <dt>Compared with {formatMonthShort(prev)}</dt>
             <dd>{diff === 0 ? 'No change' : `${d.money(Math.abs(diff))} ${diff > 0 ? 'more' : 'less'}`}
@@ -154,27 +150,6 @@ export default function Reports() {
             </BarChart>
           </ResponsiveContainer>
         </div>
-      </section>
-
-      <section className="panel">
-        <h2>Income vs. expenses</h2>
-        <p className="muted small">Left is income minus spending and what you saved or invested.</p>
-        <table>
-          <thead><tr><th>Month</th><th className="r">Income</th><th className="r">Spent</th><th className="r">Left</th></tr></thead>
-          <tbody>
-            {[...series].reverse().map((m) => {
-              const left = m.incomeCents - m.expenseCents - savedInMonth(d.savings, m.month);
-              return (
-                <tr key={m.month} className={m.month === month ? 'current' : undefined}>
-                  <td>{formatMonthShort(m.month)}</td>
-                  <td className="r num">{d.money(m.incomeCents)}</td>
-                  <td className="r num">{d.money(m.expenseCents)}</td>
-                  <td className={`r num${left < 0 ? ' negative-text' : ''}`}>{d.money(left)}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
       </section>
     </div>
   );

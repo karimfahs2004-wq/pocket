@@ -10,6 +10,7 @@ import Budgets from './pages/Budgets';
 import Income from './pages/Income';
 import Settings from './pages/Settings';
 import Savings from './pages/Savings';
+import MyMoney from './pages/MyMoney';
 
 // Charts are the heaviest part of the app, so they load only when opened.
 const Reports = lazy(() => import('./pages/Reports'));
@@ -54,6 +55,7 @@ function Shell() {
             <Route path="/income" element={<Income />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/savings" element={<Savings />} />
+            <Route path="/money" element={<MyMoney />} />
             <Route path="*" element={<Home />} />
           </Routes>
         </Suspense>
