@@ -123,7 +123,6 @@ button { cursor: pointer; }
 .hero-note strong { color: var(--on-hero); }
 .hero-note a { color: var(--on-hero); }
 .hero .money-bar { margin-bottom: 4px; }
-.steps { margin: 0; padding-left: 1.2em; display: grid; gap: 8px; }
 .where { display: grid; gap: 12px; }
 .where li { display: grid; gap: 5px; }
 .where-label { display: flex; align-items: center; gap: 8px; font-size: 0.9375rem; }

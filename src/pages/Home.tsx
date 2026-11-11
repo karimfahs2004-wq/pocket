@@ -55,7 +55,6 @@ export default function Home() {
   const before = averageMonthlySpend(d.transactions.filter((t) => t.date < `${prev}-01`), addMonthKey(prev, -1));
   const showSummary = isCurrent && (d.settings.summarySeenFor ?? '') < prev && prevSpent > 0;
 
-  const isNew = d.transactions.length === 0 && d.savings.length === 0 && !d.settings.salary && !d.settings.openingBalanceCents;
   const backupDays = d.settings.lastBackupAt
     ? (Date.now() - new Date(d.settings.lastBackupAt).getTime()) / 86_400_000
     : Infinity;
@@ -87,16 +86,6 @@ export default function Home() {
           <p className="hero-note">Nothing spent yet. Tap + to add an expense.</p>
         )}
       </section>
-
-      {isNew && (
-        <section className="panel">
-          <h2>Welcome to Pocket</h2>
-          <ol className="steps">
-            <li><strong>Add what you spend.</strong> Tap the + button below. Only the amount and a name are needed.</li>
-            <li><strong>Set up your money (optional).</strong> Add your cash, salary and savings in <Link to="/money">My money</Link>. It stays off this screen for privacy.</li>
-          </ol>
-        </section>
-      )}
 
       {showSummary && (
         <section className="panel summary" aria-label={`${formatMonth(prev)} in review`}>
