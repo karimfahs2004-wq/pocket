@@ -27,8 +27,10 @@ export default function Home() {
   const spend = spendByCategory(d.transactions, month);
   // Money saved or invested isn't spending, but it isn't free to spend either.
   const saved = savedInMonth(d.savings, month);
+  // Everything in savings and investments today: cash plus what you paid for gold and silver.
+  const totalSaved = savedUpTo(d.savings, today);
   const left = totals.incomeCents - totals.expenseCents - saved;
-  const balance = currentBalance(d.transactions, d.settings.openingBalanceCents, today) - savedUpTo(d.savings, today);
+  const balance = currentBalance(d.transactions, d.settings.openingBalanceCents, today) - totalSaved;
   const out = totals.expenseCents + Math.max(saved, 0);
   const usedRatio = totals.incomeCents ? out / totals.incomeCents : out ? 1 : 0;
   const h = holdings(d.savings);
@@ -48,7 +50,7 @@ export default function Home() {
   const recent = d.transactions
     .filter((t) => t.type === 'expense' && monthOf(t.date) === month)
     .slice(0, 5);
-  const isNew = d.transactions.length === 0 && !salary;
+  const isNew = d.transactions.length === 0 && d.savings.length === 0 && !salary;
 
   const levels = d.budgets.map((b) =>
     budgetStatus(b.id === OVERALL_BUDGET_ID ? totals.expenseCents : spend.get(b.id) ?? 0, b.amountCents).level);
@@ -74,14 +76,38 @@ export default function Home() {
         {payThisMonth && <p className="hero-note">Salary of {d.money(salary.amountCents)} expected on {formatDay(pay)}. It isn't counted until then.</p>}
       </section>
 
-      <section className="stats" aria-label="Summary">
+      <section className="stats" aria-label="This month">
         <Link to="/income"><span className="muted stat-label">Income<ChevronRight size={14} aria-hidden /></span><strong>{d.money(totals.incomeCents)}</strong></Link>
         <Link to="/expenses"><span className="muted stat-label">Expenses<ChevronRight size={14} aria-hidden /></span><strong>{d.money(totals.expenseCents)}</strong></Link>
-        <Link to="/savings"><span className="muted stat-label">Saved {label}<ChevronRight size={14} aria-hidden /></span><strong>{d.money(saved)}</strong>
-          {metals && <span className="muted tiny">{metals}</span>}</Link>
-        <div><span className="muted stat-label">Balance today
-          <InfoTip label="balance today">Your starting balance, plus all income, minus all expenses and money moved to savings or investments, up to today.</InfoTip></span>
-          <strong>{d.money(balance)}</strong></div>
+      </section>
+
+      {/* Everything you own, split into what you can spend and what you've put aside. */}
+      <section className="panel money" aria-label="Your money today">
+        <div className="money-head">
+          <span className="muted">Your money today</span>
+          <strong className="money-total">{d.money(balance + totalSaved)}</strong>
+        </div>
+        {balance > 0 && totalSaved > 0 && (
+          <div className="money-bar" role="img" aria-label={`${Math.round((balance / (balance + totalSaved)) * 100)}% to spend, ${Math.round((totalSaved / (balance + totalSaved)) * 100)}% saved and invested`}>
+            <span className="spend" style={{ flexGrow: balance }} />
+            <span className="saved" style={{ flexGrow: totalSaved }} />
+          </div>
+        )}
+        <div className="money-row">
+          <span className="key spend" aria-hidden />
+          <span className="grow">To spend
+            <InfoTip label="to spend">Your starting balance, plus all income, minus all expenses and money moved to savings or investments, up to today.</InfoTip>
+          </span>
+          <strong className={`num${balance < 0 ? ' negative-text' : ''}`}>{d.money(balance)}</strong>
+        </div>
+        <Link to="/savings" className="money-row">
+          <span className="key saved" aria-hidden />
+          <span className="grow">Saved & invested
+            {(saved !== 0 || metals) && <span className="muted tiny">{[saved !== 0 && `${saved > 0 ? '+' : '-'}${d.money(Math.abs(saved))} ${label}`, metals].filter(Boolean).join(', ')}</span>}
+          </span>
+          <strong className="num">{d.money(totalSaved)}</strong>
+          <ChevronRight size={16} aria-hidden className="muted" />
+        </Link>
       </section>
 
       {isNew && (

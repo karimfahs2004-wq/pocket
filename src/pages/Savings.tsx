@@ -6,7 +6,7 @@ import { useAppData } from '../data/hooks';
 import { deleteSavings, restoreSavings, saveSavings } from '../data/repo';
 import { formatDay, todayISO } from '../domain/dates';
 import { centsToInput, parseAmount } from '../domain/money';
-import { formatQuantity, holdings, parseQuantity } from '../domain/savings';
+import { formatQuantity, holdings, parseQuantity, savedUpTo } from '../domain/savings';
 import type { Asset, SavingsEntry } from '../domain/types';
 
 const NAMES: Record<Asset, string> = { cash: 'Cash savings', gold: 'Gold', silver: 'Silver' };
@@ -135,6 +135,12 @@ export default function Savings() {
           <h1>Savings & investments</h1>
         </div>
       </header>
+
+      <section className="total-saved" aria-label="Total savings">
+        <span className="muted">Total saved & invested</span>
+        <strong>{d.money(savedUpTo(d.savings, todayISO()))}</strong>
+        <span className="muted small">Cash savings plus what you paid for gold and silver</span>
+      </section>
 
       <Card asset="cash" />
       <div className="asset-pair">
