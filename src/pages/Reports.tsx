@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { TransactionRow } from '../components/TransactionRow';
-import { Dot, Empty, MonthPicker, useUi } from '../components/ui';
+import { CatIcon } from '../components/CatIcon';
+import { Empty, MonthPicker, useUi } from '../components/ui';
 import { useAppData } from '../data/hooks';
 import { addMonthKey, formatMonth, formatMonthShort, monthOf, todayISO } from '../domain/dates';
 import { averageMonthlySpend, monthTotals, monthlySeries, spendByCategory } from '../domain/reports';
@@ -106,7 +107,7 @@ export default function Reports() {
               {spend.map((s) => (
                 <li key={s.id}>
                   <button aria-pressed={selected === s.id} onClick={() => setSelected(selected === s.id ? null : s.id)}>
-                    <Dot slot={slot(s.id)} />
+                    <CatIcon small category={d.categoryById.get(s.id)} />
                     <span className="grow">{s.name}</span>
                     <span className="muted small num">{pct(s.pct)}</span>
                     <span className="num cat-amt">{d.money(s.cents)}</span>

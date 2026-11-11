@@ -3,6 +3,7 @@ import { useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { AmountField } from '../components/AmountField';
 import { BackButton, Sheet, primeKeyboard, useUi } from '../components/ui';
+import { useCountUp } from '../components/useCountUp';
 import { useAppData } from '../data/hooks';
 import { updateSettings } from '../data/repo';
 import { addMonthKey, formatDay, formatMonth, formatMonthShort, monthOf, todayISO } from '../domain/dates';
@@ -38,13 +39,14 @@ function StartingSheet({ current, onClose }: { current: number; onClose: () => v
 export default function MyMoney() {
   const d = useAppData();
   const [editStart, setEditStart] = useState(false);
-  if (!d.ready) return null;
-
   const today = todayISO();
   const month = monthOf(today);
   const saved = savedUpTo(d.savings, today);
   const cash = currentBalance(d.transactions, d.settings.openingBalanceCents, today) - saved;
   const total = cash + saved;
+  const count = useCountUp(d.ready ? total : 0);
+  if (!d.ready) return null;
+
   const h = holdings(d.savings);
   const holding = [
     h.cash.cents > 0 && `${d.money(h.cash.cents)} cash savings`,
@@ -66,9 +68,9 @@ export default function MyMoney() {
         <div className="line"><BackButton /><h1>My money</h1></div>
       </header>
 
-      <section className="hero" aria-label="Total money">
+      <section className="hero" aria-label="Total money" data-settled={count.settled || undefined}>
         <p className="hero-label">Total money</p>
-        <p className={`hero-value${total < 0 ? ' negative' : ''}`}>{d.money(total)}</p>
+        <p className={`hero-value${total < 0 ? ' negative' : ''}`}>{d.money(count.value)}</p>
         {cash > 0 && saved > 0 && (
           <div className="money-bar" role="img" aria-label={`${Math.round((cash / total) * 100)}% cash, ${Math.round((saved / total) * 100)}% savings and investments`}>
             <span className="spend" style={{ flexGrow: cash }} />

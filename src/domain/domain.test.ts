@@ -5,7 +5,7 @@ import { budgetStatus } from './budget';
 import { addMonthsClamped, isValidDate, todayISO } from './dates';
 import { formatMoney, parseAmount } from './money';
 import { monthsDue, nextPayday, paydayIn } from './salary';
-import { averageMonthlySpend, currentBalance, monthTotals, monthlySeries, spendByCategory } from './reports';
+import { averageMonthlySpend, cumulativeByDay, currentBalance, monthTotals, monthlySeries, spendByCategory } from './reports';
 import type { SavingsEntry, Transaction } from './types';
 
 const tx = (o: Partial<Transaction>): Transaction => ({
@@ -127,5 +127,14 @@ describe('savings and investments', () => {
     expect(parseQuantity('1,25', false)).toBe(1250);
     expect(parseQuantity('0', false)).toBeNull();
     expect(parseQuantity('1.2345', false)).toBeNull();
+  });
+});
+
+describe('spending pace', () => {
+  it('builds a running total per day', () => {
+    const tx = (date: string, amountCents: number, type = 'expense') => ({ id: date + amountCents, type, name: 'x', amountCents, categoryId: 'food', date }) as Transaction;
+    const list = [tx('2026-11-01', 100), tx('2026-11-03', 50), tx('2026-11-03', 25), tx('2026-11-09', 999), tx('2026-11-02', 500, 'income'), tx('2026-10-02', 70)];
+    expect(cumulativeByDay(list, '2026-11', 4)).toEqual([100, 100, 175, 175]);
+    expect(cumulativeByDay(list, '2026-12', 2)).toEqual([0, 0]);
   });
 });

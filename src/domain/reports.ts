@@ -43,6 +43,18 @@ export function currentBalance(txs: Transaction[], openingCents: number, today: 
   }, openingCents);
 }
 
+/** Running expense total for each day of a month, from day 1 up to `lastDay`. */
+export function cumulativeByDay(txs: Transaction[], month: MonthKey, lastDay: number): number[] {
+  const perDay = new Array<number>(lastDay).fill(0);
+  for (const x of txs) {
+    if (x.type !== 'expense' || monthOf(x.date) !== month) continue;
+    const day = Number(x.date.slice(8));
+    if (day <= lastDay) perDay[day - 1] += x.amountCents;
+  }
+  let sum = 0;
+  return perDay.map((v) => (sum += v));
+}
+
 /** Average across months with expenses, up to and including `upTo`. */
 export function averageMonthlySpend(txs: Transaction[], upTo: MonthKey): { cents: number; months: number } {
   const byMonth = new Map<MonthKey, number>();

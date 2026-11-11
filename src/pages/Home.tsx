@@ -3,10 +3,13 @@ import { ChevronRight, CircleAlert, CloudDownload, TriangleAlert, Wallet } from 
 import { budgetStatus } from '../domain/budget';
 import { saveBackupFile } from '../data/saveBackup';
 import { TransactionRow } from '../components/TransactionRow';
-import { Dot, MonthPicker, useUi } from '../components/ui';
+import { CatIcon } from '../components/CatIcon';
+import { PaceChart } from '../components/PaceChart';
+import { useCountUp } from '../components/useCountUp';
+import { MonthPicker, useUi } from '../components/ui';
 import { useAppData } from '../data/hooks';
-import { addMonthKey, formatMonth, monthOf, todayISO } from '../domain/dates';
-import { averageMonthlySpend, monthTotals, spendByCategory } from '../domain/reports';
+import { addDays, addMonthKey, formatMonth, monthOf, todayISO } from '../domain/dates';
+import { averageMonthlySpend, cumulativeByDay, monthTotals, spendByCategory } from '../domain/reports';
 import { updateSettings } from '../data/repo';
 import { OVERALL_BUDGET_ID } from '../domain/types';
 
@@ -21,6 +24,7 @@ const TOP_CATEGORIES = 4;
 export default function Home() {
   const d = useAppData();
   const { month, setMonth, toast } = useUi();
+  const count = useCountUp(d.ready ? monthTotals(d.transactions, month).expenseCents : 0);
   if (!d.ready) return null;
 
   const today = todayISO();
@@ -38,6 +42,24 @@ export default function Home() {
   // Days counted so far: up to today for this month, the whole month for past ones.
   const [y, m] = month.split('-').map(Number);
   const days = isCurrent ? Number(today.slice(8)) : new Date(y, m, 0).getDate();
+
+  // Today and this week (Monday to today), across all expenses.
+  const [ty, tm, td] = today.split('-').map(Number);
+  const monday = addDays(today, -((new Date(ty, tm - 1, td).getDay() + 6) % 7));
+  const all = d.transactions.filter((t) => t.type === 'expense');
+  const sumOf = (list: typeof all) => list.reduce((s, t) => s + t.amountCents, 0);
+  const todayList = all.filter((t) => t.date === today);
+  const weekList = all.filter((t) => t.date >= monday && t.date <= today);
+  const countLabel = (n: number) => (n === 0 ? 'No expenses' : `${n} ${n === 1 ? 'expense' : 'expenses'}`);
+
+  // Day-by-day running totals, against the month before.
+  const prevOfMonth = addMonthKey(month, -1);
+  const [py, pm] = prevOfMonth.split('-').map(Number);
+  const pace = {
+    current: cumulativeByDay(d.transactions, month, days),
+    previous: cumulativeByDay(d.transactions, prevOfMonth, new Date(py, pm, 0).getDate()),
+  };
+  const showPace = spent > 0 || (pace.previous.at(-1) ?? 0) > 0;
 
   const budgetOf = (id: string) => d.budgets.find((b) => b.id === id)?.amountCents;
   const overall = budgetOf(OVERALL_BUDGET_ID);
@@ -63,9 +85,9 @@ export default function Home() {
     <div className="stack">
       <MonthPicker action={<Link to="/money" className="icon-btn edge" aria-label="My money"><Wallet size={22} aria-hidden /></Link>} />
 
-      <section className="hero" aria-label={`Spent ${label}`}>
+      <section className="hero" aria-label={`Spent ${label}`} data-settled={count.settled || undefined}>
         <p className="hero-label">Spent {label}</p>
-        <p className="hero-value">{d.money(spent)}</p>
+        <p className="hero-value" aria-label={d.money(spent)}>{d.money(count.value)}</p>
         {status ? (
           <>
             <div className={`hero-bar ${status.level}`} role="img" aria-label={`${Math.round(status.ratio * 100)}% of your budget used`}>
@@ -86,6 +108,20 @@ export default function Home() {
           <p className="hero-note">Nothing spent yet. Tap + to add an expense.</p>
         )}
       </section>
+
+      {isCurrent && (
+        <section className="stats" aria-label="Today and this week">
+          <Link to="/expenses"><span className="muted stat-label">Today</span><strong>{d.money(sumOf(todayList))}</strong><span className="muted tiny">{countLabel(todayList.length)}</span></Link>
+          <Link to="/expenses"><span className="muted stat-label">Since Monday</span><strong>{d.money(sumOf(weekList))}</strong><span className="muted tiny">{countLabel(weekList.length)}</span></Link>
+        </section>
+      )}
+
+      {showPace && (
+        <section className="panel" aria-label="Spending pace">
+          <h2>Spending pace</h2>
+          <PaceChart {...pace} currentName={monthName} previousName={formatMonth(prevOfMonth).split(' ')[0]} money={d.money} />
+        </section>
+      )}
 
       {showSummary && (
         <section className="panel summary" aria-label={`${formatMonth(prev)} in review`}>
@@ -122,7 +158,7 @@ export default function Home() {
               return (
                 <li key={id}>
                   <span className="where-label">
-                    <Dot slot={c?.colorSlot ?? 6} />
+                    <CatIcon small category={c} />
                     <span className="grow">{c?.name ?? 'Other'}</span>
                     <span className="num"><strong>{d.money(cents)}</strong>{limit ? <span className="muted"> of {d.money(limit)}</span> : null}</span>
                   </span>

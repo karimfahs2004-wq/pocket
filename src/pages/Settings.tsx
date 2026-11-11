@@ -3,7 +3,8 @@ import { useRef, useState, type FormEvent } from 'react';
 import { checkPin, removePin, setPin } from '../data/pin';
 import { PinPad } from '../components/PinPad';
 import { Link } from 'react-router-dom';
-import { BackButton, Dot, Sheet, useUi } from '../components/ui';
+import { CatIcon } from '../components/CatIcon';
+import { BackButton, Sheet, useUi } from '../components/ui';
 import { buildBackup, restoreBackup } from '../data/backup';
 import { saveBackupFile } from '../data/saveBackup';
 import { useAppData } from '../data/hooks';
@@ -170,7 +171,7 @@ export default function Settings() {
         <ul className="plain-list">
           {list.map((c) => (
             <li key={c.id} className="line">
-              <Dot slot={c.colorSlot} />
+              <CatIcon small category={c} />
               <span className="grow">{c.name}</span>
               <button className="icon-btn" aria-label={`Edit ${c.name}`} onClick={() => setSheet({ category: c })}><Pencil size={18} aria-hidden /></button>
               <button className="icon-btn" aria-label={`Delete ${c.name}`} onClick={() => remove(c)}><Trash2 size={18} aria-hidden /></button>

@@ -1,7 +1,8 @@
 import { Pencil, Plus } from 'lucide-react';
+import { CatIcon } from '../components/CatIcon';
 import { useState, type FormEvent } from 'react';
 import { AmountField } from '../components/AmountField';
-import { Dot, Empty, LevelBadge, Meter, MonthPicker, primeKeyboard, Sheet, useUi } from '../components/ui';
+import { Empty, LevelBadge, Meter, MonthPicker, primeKeyboard, Sheet, useUi } from '../components/ui';
 import { useAppData } from '../data/hooks';
 import { removeBudget, setBudget } from '../data/repo';
 import { budgetStatus, type BudgetStatus } from '../domain/budget';
@@ -74,7 +75,7 @@ export default function Budgets() {
   const BudgetCard = ({ name, slot, status: s, onEdit }: { name: string; slot?: number; status: BudgetStatus; onEdit: () => void }) => (
     <div className="panel budget" onClick={onEdit}>
       <span className="line">
-        {slot !== undefined && <Dot slot={slot} />}
+        {slot !== undefined && <CatIcon small category={{ name, colorSlot: slot }} />}
         <strong className="grow">{name}</strong>
         <LevelBadge level={s.level} />
         <button className="icon-btn tx-edit" onClick={(e) => { e.stopPropagation(); onEdit(); }} aria-label={`Edit ${name}`}><Pencil size={18} aria-hidden /></button>

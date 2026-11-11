@@ -123,6 +123,23 @@ button { cursor: pointer; }
 .hero-note strong { color: var(--on-hero); }
 .hero-note a { color: var(--on-hero); }
 .hero .money-bar { margin-bottom: 4px; }
+.cat-icon { flex: none; display: inline-grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; }
+.cat-icon.small { width: 28px; height: 28px; }
+.pace { display: grid; gap: 8px; }
+.pace-line { color: var(--muted); font-size: 0.9375rem; }
+.pace-line strong { color: var(--ink); }
+.pace svg { width: 100%; height: auto; display: block; overflow: visible; }
+.pace-base { stroke: var(--line-strong); stroke-width: 1; }
+.pace-prev { fill: none; stroke: var(--line-strong); stroke-width: 2; stroke-dasharray: 4 4; stroke-linecap: round; }
+.pace-cur { fill: none; stroke: var(--series-1); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; animation: draw 0.9s ease-out; }
+.pace-dot { fill: var(--series-1); stroke: var(--surface); stroke-width: 2; }
+@keyframes draw { from { stroke-dashoffset: 1; } }
+.pace-legend { display: flex; gap: 16px; font-size: 0.8125rem; color: var(--muted); }
+.pace-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.pace-key { display: inline-block; width: 16px; height: 0; border-top: 2.5px solid var(--series-1); }
+.pace-key.prev { border-top: 2px dashed var(--line-strong); }
+.where-track span, .hero-bar span, .meter span, .money-bar span { transform-origin: left; animation: grow 0.6s ease-out; }
+@keyframes grow { from { transform: scaleX(0); } }
 .where { display: grid; gap: 12px; }
 .where li { display: grid; gap: 5px; }
 .where-label { display: flex; align-items: center; gap: 8px; font-size: 0.9375rem; }
