@@ -116,6 +116,7 @@ button { cursor: pointer; }
 .hero-value { font: 680 clamp(2.5rem, 13vw, 3.25rem)/1.1 var(--display); letter-spacing: -0.02em; margin: 2px 0 16px; overflow-wrap: anywhere; }
 .hero-value.negative { color: #ffb3b3; }
 .hero-note { margin-top: 12px; color: var(--on-hero-muted); font-size: 0.875rem; }
+.hero-metals { margin-top: 4px; color: var(--on-hero); font-size: 1.05rem; font-weight: 600; }
 .hero-bar { height: 8px; border-radius: 4px; background: var(--hero-track); overflow: hidden; }
 .hero-bar span { display: block; height: 100%; border-radius: 4px; background: #fff; }
 .hero-bar.near span { background: #fab219; }

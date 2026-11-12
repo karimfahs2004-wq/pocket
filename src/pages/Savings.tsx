@@ -76,8 +76,8 @@ function EntrySheet({ asset, direction, entry, onClose }: {
         </div>
         <p className="hint">
           {direction === 'in'
-            ? 'The price comes out of your cash. Your total savings stay the same, because the metal is counted at the price you paid.'
-            : 'The money goes back to your cash. If you sell for more than you paid, the profit is added to your savings.'}
+            ? 'The price you paid comes out of your savings. The metal is kept as a count, not a dollar value.'
+            : 'The money you get is added back to your savings.'}
         </p>
         <div className="sheet-actions">
           <button className="btn primary wide">{entry ? 'Save changes' : verb(asset, direction)}</button>
@@ -106,7 +106,7 @@ export default function Savings() {
           <h2 className="grow">{NAMES[asset]}</h2>
         </div>
         <p className="asset-value">{formatQuantity(x.quantityMilli, asset)}</p>
-        <p className="muted small">{has ? `Counted as ${d.money(x.costCents)}, the price you paid` : 'None yet'}</p>
+        {!has && <p className="muted small">None yet</p>}
         <div className="row-actions start">
           <button className="btn small primary" onClick={() => open({ asset, direction: 'in' })}><Plus size={15} aria-hidden />Buy</button>
           {has && <button className="btn small" onClick={() => open({ asset, direction: 'out' })}>Sell</button>}
@@ -124,11 +124,7 @@ export default function Savings() {
         </div>
       </header>
 
-      <section className="total-saved" aria-label="Gold and silver value">
-        <span className="muted">In your savings as</span>
-        <strong>{d.money(m.gold.costCents + m.silver.costCents)}</strong>
-        <span className="muted small">Counted at the price you paid, not today's market price.</span>
-      </section>
+      <p className="muted small">Kept as counts because prices move. Buying takes the price out of your savings, selling adds the money back.</p>
 
       <div className="asset-pair">
         <Card asset="gold" />

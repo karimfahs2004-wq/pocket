@@ -45,9 +45,9 @@ export default function MyMoney() {
   // Gold and silver are part of it, counted at the price you paid.
   const m = metals(d.savings, today);
   const total = currentBalance(d.transactions, d.settings.openingBalanceCents, today) + m.gainCents;
-  const metal = m.gold.costCents + m.silver.costCents;
-  const cash = total - metal;
-  const count = useCountUp(d.ready ? total : 0);
+  // Gold and silver are kept as counts only; what you paid for them has left your savings.
+  const cash = total - (m.gold.costCents + m.silver.costCents);
+  const count = useCountUp(d.ready ? cash : 0);
   if (!d.ready) return null;
 
   const holding = [
@@ -68,28 +68,17 @@ export default function MyMoney() {
         <div className="line"><BackButton /><h1>My money</h1></div>
       </header>
 
-      <section className="hero" aria-label="Total savings" data-settled={count.settled || undefined}>
-        <p className="hero-label">Total savings</p>
-        <p className={`hero-value${total < 0 ? ' negative' : ''}`}>{d.money(count.value)}</p>
-        {cash > 0 && metal > 0 && (
-          <div className="money-bar" role="img" aria-label={`${Math.round((cash / total) * 100)}% cash, ${Math.round((metal / total) * 100)}% gold and silver`}>
-            <span className="spend" style={{ flexGrow: cash }} />
-            <span className="saved" style={{ flexGrow: metal }} />
-          </div>
-        )}
-        <p className="hero-note">Everything you've received minus everything you've spent. Calculated automatically.</p>
+      <section className="hero" aria-label="Savings" data-settled={count.settled || undefined}>
+        <p className="hero-label">Savings</p>
+        <p className={`hero-value${cash < 0 ? ' negative' : ''}`}>{d.money(count.value)}</p>
+        {holding && <p className="hero-metals">+ {holding}</p>}
+        <p className="hero-note">Everything you've received minus everything you've spent, including what you paid for gold and silver. Calculated automatically.</p>
       </section>
 
-      <section className="panel rows" aria-label="What you own">
-        <div className="money-row">
-          <span className="key spend" aria-hidden />
-          <span className="grow">Cash<span className="muted tiny">Savings you hold as money</span></span>
-          <strong className={`num${cash < 0 ? ' negative-text' : ''}`}>{d.money(cash)}</strong>
-        </div>
+      <section className="panel rows" aria-label="Gold and silver">
         <Link to="/savings" className="money-row">
           <span className="key saved" aria-hidden />
-          <span className="grow">Gold & silver<span className="muted tiny">{holding ? `${holding}, at the price you paid` : 'Add gold coins or silver ounces you buy'}</span></span>
-          <strong className="num">{d.money(metal)}</strong>
+          <span className="grow">Gold & silver<span className="muted tiny">{holding ? `${holding}. Buy, sell or see history` : 'Add gold coins or silver ounces you buy'}</span></span>
           <ChevronRight size={16} aria-hidden className="muted" />
         </Link>
       </section>
