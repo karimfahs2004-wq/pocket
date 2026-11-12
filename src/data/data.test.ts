@@ -4,8 +4,8 @@ import { buildBackup, restoreBackup, validateBackup } from './backup';
 import { db } from './db';
 import { checkPin, clearOldFaceIdLock, removePin, setPin } from './pin';
 import {
-  addCategory, deleteTransaction, getSettings, removeCategory, removeSalary, saveSalary,
-  saveTransaction, syncSalary, updateSettings,
+  addCategory, getSettings, removeCategory, retireSalary,
+  saveTransaction, updateSettings,
 } from './repo';
 
 const income = async () =>
@@ -38,49 +38,28 @@ describe('categories', () => {
   });
 });
 
-describe('salary', () => {
-  it('counts only once payday arrives', async () => {
-    await saveSalary(100000, 25, '2026-11-04');
+describe('old salary setting', () => {
+  const setOld = (payDay: number, lastPaidMonth: string) =>
+    db.settings.put({ key: 'salary', value: { amountCents: 100000, payDay, lastPaidMonth } });
+  it('adds pay already due, then stops for good', async () => {
+    await setOld(1, '2026-09');
+    await retireSalary('2026-11-04');
+    expect((await income()).map((t) => t.date)).toEqual(['2026-10-01', '2026-11-01']);
+    expect((await getSettings()).salary).toBeUndefined();
+    await retireSalary('2027-03-01');
+    expect((await income()).length).toBe(2);
+  });
+  it('does not add pay before payday', async () => {
+    await setOld(25, '2026-10');
+    await retireSalary('2026-11-04');
     expect(await income()).toEqual([]);
-    await syncSalary('2026-11-24');
-    expect(await income()).toEqual([]);
-    await syncSalary('2026-11-25');
-    expect((await income()).map((t) => [t.date, t.amountCents])).toEqual([['2026-11-25', 100000]]);
-  });
-  it('adds this month when payday has passed, and only once', async () => {
-    await saveSalary(100000, 1, '2026-11-04');
-    await syncSalary('2026-11-04');
-    await syncSalary('2026-11-04');
-    expect((await income()).map((t) => t.date)).toEqual(['2026-11-01']);
-  });
-  it('catches up after time away', async () => {
-    await saveSalary(100000, 1, '2026-11-04');
-    await syncSalary('2027-02-15');
-    expect((await income()).map((t) => t.date)).toEqual(['2026-11-01', '2026-12-01', '2027-01-01', '2027-02-01']);
-  });
-  it('changing it keeps past months accurate', async () => {
-    await saveSalary(100000, 1, '2026-11-04');
-    await saveSalary(150000, 1, '2026-11-20');
-    await syncSalary('2026-12-01');
-    expect((await income()).map((t) => t.amountCents)).toEqual([100000, 150000]);
-  });
-  it('does not bring back a deleted payment', async () => {
-    await saveSalary(100000, 1, '2026-11-04');
-    const [t] = await income();
-    await deleteTransaction(t.id);
-    await syncSalary('2026-11-30');
-    expect(await income()).toEqual([]);
+    expect((await getSettings()).salary).toBeUndefined();
   });
   it('does not double a salary entered by hand', async () => {
     await saveTransaction({ type: 'income', name: 'Pay', amountCents: 90000, categoryId: 'salary', date: '2026-11-02' });
-    await saveSalary(100000, 3, '2026-11-04');
+    await setOld(1, '2026-10');
+    await retireSalary('2026-11-04');
     expect((await income()).map((t) => t.amountCents)).toEqual([90000]);
-  });
-  it('removing it stops future pay and keeps the past', async () => {
-    await saveSalary(100000, 1, '2026-11-04');
-    await removeSalary();
-    await syncSalary('2027-03-01');
-    expect((await income()).length).toBe(1);
   });
 });
 
@@ -128,8 +107,9 @@ describe('upgrade from the first version', () => {
     expect(await db.budgets.count()).toBe(1);
     expect(db.tables.map((t) => t.name)).not.toContain('recurring');
     expect((await db.transactions.get('s1')) as object).not.toHaveProperty('recurringId');
-    await syncSalary();
+    await retireSalary();
     expect(await db.transactions.count()).toBe(4);
+    expect((await getSettings()).salary).toBeUndefined();
   });
 
   it('records payments that fell due just before the upgrade', async () => {
@@ -147,18 +127,16 @@ describe('upgrade from the first version', () => {
 
 describe('backup', () => {
   it('round-trips everything', async () => {
-    await saveSalary(100000, 1, '2026-11-04');
+    await saveTransaction({ type: 'income', name: 'Pay', amountCents: 100000, categoryId: 'salary', date: '2026-11-01' });
     await updateSettings({ openingBalanceCents: 5000, currency: 'EUR' });
     await db.budgets.put({ id: 'overall', amountCents: 50000 });
     const backup = JSON.parse(JSON.stringify(await buildBackup()));
     await db.transactions.clear();
     await updateSettings({ currency: 'USD' });
-    await removeSalary();
     expect(await restoreBackup(backup, '2026-11-04')).toBe(1);
     expect(await db.transactions.count()).toBe(1);
     const s = await getSettings();
     expect(s.currency).toBe('EUR');
-    expect(s.salary?.amountCents).toBe(100000);
     expect((await db.budgets.toArray())[0].amountCents).toBe(50000);
   });
   it('restores a backup from the first version', async () => {
@@ -173,10 +151,9 @@ describe('backup', () => {
       },
     };
     expect(await restoreBackup(v1, '2026-11-04')).toBe(1);
-    expect((await getSettings()).salary).toEqual({ amountCents: 120000, payDay: 1, lastPaidMonth: '2026-11' });
+    expect((await getSettings()).salary).toBeUndefined();
     expect((await db.transactions.get('p')) as object).not.toHaveProperty('recurringId');
-    await syncSalary('2026-12-01');
-    expect(await db.transactions.count()).toBe(2);
+    expect(await db.transactions.count()).toBe(1);
   });
   it('rejects bad files without touching data', async () => {
     await saveTransaction({ type: 'income', name: 'Pay', amountCents: 1, categoryId: 'salary', date: '2026-11-01' });

@@ -1,4 +1,4 @@
-import { addMonthKey, monthOf, todayISO } from '../domain/dates';
+import { todayISO } from '../domain/dates';
 import { dedupeSlots, freeSlot } from '../domain/colors';
 import { monthsDue, paydayIn } from '../domain/salary';
 import {
@@ -37,7 +37,7 @@ export const restoreSavings = (e: SavingsEntry) => db.savings.put(e);
  * Adds salary as income once its payday arrives, so expected pay never counts as money
  * received. Safe to run as often as you like, and it catches up after time away.
  */
-export async function syncSalary(today = todayISO()): Promise<number> {
+async function syncSalary(today = todayISO()): Promise<number> {
   let created = 0;
   await db.transaction('rw', db.settings, db.transactions, async () => {
     const salary = (await db.settings.get('salary'))?.value as Settings['salary'];
@@ -62,16 +62,15 @@ export async function syncSalary(today = todayISO()): Promise<number> {
   return created;
 }
 
-/** A change applies from the next payday. Salary already received stays as it was. */
-export async function saveSalary(amountCents: number, payDay: number, today = todayISO()) {
-  const current = (await getSettings()).salary;
-  const lastPaidMonth = current?.lastPaidMonth ?? addMonthKey(monthOf(today), -1);
-  await db.settings.put({ key: 'salary', value: { amountCents, payDay, lastPaidMonth } });
+/**
+ * Salary setup was removed: income is now added by hand. An old salary setting is caught up
+ * one last time, so pay already due isn't lost, and then deleted.
+ */
+export async function retireSalary(today = todayISO()) {
+  if (!(await db.settings.get('salary'))) return;
   await syncSalary(today);
+  await db.settings.delete('salary');
 }
-
-/** Stops future salary. Past salary stays in your history. */
-export const removeSalary = () => db.settings.delete('salary');
 
 // --- Budgets
 

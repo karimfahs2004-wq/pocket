@@ -1,4 +1,4 @@
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Plus } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { AmountField } from '../components/AmountField';
@@ -6,10 +6,9 @@ import { BackButton, Sheet, primeKeyboard, useUi } from '../components/ui';
 import { useCountUp } from '../components/useCountUp';
 import { useAppData } from '../data/hooks';
 import { updateSettings } from '../data/repo';
-import { addMonthKey, formatDay, formatMonth, formatMonthShort, monthOf, todayISO } from '../domain/dates';
+import { addMonthKey, formatMonth, formatMonthShort, monthOf, todayISO } from '../domain/dates';
 import { centsToInput, parseAmount } from '../domain/money';
 import { currentBalance, monthTotals, monthlySeries } from '../domain/reports';
-import { nextPayday } from '../domain/salary';
 import { formatQuantity, metals } from '../domain/savings';
 
 function StartingSheet({ current, onClose }: { current: number; onClose: () => void }) {
@@ -38,6 +37,7 @@ function StartingSheet({ current, onClose }: { current: number; onClose: () => v
 /** Everything private in one place: what you own, what comes in, and how each month ended. */
 export default function MyMoney() {
   const d = useAppData();
+  const { newTransaction } = useUi();
   const [editStart, setEditStart] = useState(false);
   const today = todayISO();
   const month = monthOf(today);
@@ -57,8 +57,6 @@ export default function MyMoney() {
 
   const t = monthTotals(d.transactions, month);
   const savedNow = t.incomeCents - t.expenseCents;
-  const salary = d.settings.salary;
-  const pay = salary && nextPayday(salary, today);
   const history = monthlySeries(d.transactions, addMonthKey(month, -1), 5).reverse()
     .filter((x) => x.incomeCents || x.expenseCents);
 
@@ -90,14 +88,12 @@ export default function MyMoney() {
           <div><dt>Spent</dt><dd className="num">-{d.money(t.expenseCents)}</dd></div>
           <div className="sum-total"><dt>{savedNow < 0 ? 'Overspent this month' : 'Saved this month'}</dt><dd className={`num${savedNow < 0 ? ' negative-text' : ''}`}>{d.money(Math.abs(savedNow))}</dd></div>
         </dl>
-        {salary && pay && monthOf(pay) === month && (
-          <p className="muted small">Salary of {d.money(salary.amountCents)} is expected on {formatDay(pay)}. It isn't counted until then.</p>
-        )}
+        <button className="btn primary start" onClick={() => newTransaction('income')}><Plus size={15} aria-hidden />Add income</button>
       </section>
 
       <section className="panel rows" aria-label="Manage">
         <Link to="/income" className="money-row first">
-          <span className="grow">Income & salary<span className="muted tiny">{salary ? `${d.money(salary.amountCents)} a month, paid on day ${salary.payDay}` : 'Set your salary or add other income'}</span></span>
+          <span className="grow">All income<span className="muted tiny">Everything you've received, month by month</span></span>
           <ChevronRight size={16} aria-hidden className="muted" />
         </Link>
         <button className="money-row" onClick={() => { primeKeyboard(); setEditStart(true); }}>

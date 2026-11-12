@@ -1,6 +1,6 @@
 import { isValidDate, todayISO } from '../domain/dates';
 import { migrateLegacy, stripLegacy, type LegacyRule, type LegacyTransaction } from '../domain/legacy';
-import { getSettings, syncSalary, updateSettings } from './repo';
+import { getSettings, retireSalary, updateSettings } from './repo';
 import { db, newId } from './db';
 
 const APP = 'pocket';
@@ -96,6 +96,6 @@ export async function restoreBackup(raw: unknown, today = todayISO(), keepLock =
     await db.budgets.bulkAdd(data.budgets);
     await updateSettings(settings);
   });
-  await syncSalary(today);
+  await retireSalary(today);
   return transactions.length;
 }

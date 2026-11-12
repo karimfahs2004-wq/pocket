@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect } from 'react';
 import { NavLink, Route, Routes, useLocation } from 'react-router-dom';
 import { ChartColumn, House, Plus, Receipt, Target, type LucideIcon } from 'lucide-react';
-import { fixCategoryColors, syncSalary } from './data/repo';
+import { fixCategoryColors, retireSalary } from './data/repo';
 import { UiProvider, useUi } from './components/ui';
 import { LockGate } from './components/LockGate';
 import Home from './pages/Home';
@@ -69,12 +69,7 @@ export default function App() {
     // Ask the browser not to clear this app's data when the device runs low on space.
     navigator.storage?.persist?.();
     void fixCategoryColors();
-    const sync = () => {
-      if (document.visibilityState === 'visible') void syncSalary();
-    };
-    sync();
-    document.addEventListener('visibilitychange', sync);
-    return () => document.removeEventListener('visibilitychange', sync);
+    void retireSalary();
   }, []);
 
   return (
