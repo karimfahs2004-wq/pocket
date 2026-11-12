@@ -48,7 +48,6 @@ export default function Home() {
   const monday = addDays(today, -((new Date(ty, tm - 1, td).getDay() + 6) % 7));
   const all = d.transactions.filter((t) => t.type === 'expense');
   const sumOf = (list: typeof all) => list.reduce((s, t) => s + t.amountCents, 0);
-  const todayList = all.filter((t) => t.date === today);
   const weekList = all.filter((t) => t.date >= monday && t.date <= today);
   const countLabel = (n: number) => (n === 0 ? 'No expenses' : `${n} ${n === 1 ? 'expense' : 'expenses'}`);
 
@@ -110,8 +109,7 @@ export default function Home() {
       </section>
 
       {isCurrent && (
-        <section className="stats" aria-label="Today and this week">
-          <Link to="/expenses"><span className="muted stat-label">Today</span><strong>{d.money(sumOf(todayList))}</strong><span className="muted tiny">{countLabel(todayList.length)}</span></Link>
+        <section className="stats" aria-label="This week">
           <Link to="/expenses"><span className="muted stat-label">Since Monday</span><strong>{d.money(sumOf(weekList))}</strong><span className="muted tiny">{countLabel(weekList.length)}</span></Link>
         </section>
       )}
