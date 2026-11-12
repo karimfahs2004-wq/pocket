@@ -1,4 +1,4 @@
-import { formatQuantity, holdings, parseQuantity, savedInMonth, savedUpTo } from './savings';
+import { formatQuantity, metals, parseQuantity } from './savings';
 import { dedupeSlots, freeSlot } from './colors';
 import { describe, expect, it } from 'vitest';
 import { budgetStatus } from './budget';
@@ -98,26 +98,27 @@ describe('category colours', () => {
   });
 });
 
-describe('savings and investments', () => {
-  const e = (o: object) => ({ id: Math.random().toString(), asset: 'cash', direction: 'in', amountCents: 10000, date: '2026-11-05', ...o }) as SavingsEntry;
-  const list = [
-    e({}),
-    e({ direction: 'out', amountCents: 2500, date: '2026-11-20' }),
-    e({ asset: 'gold', amountCents: 50000, quantityMilli: 2000, date: '2026-10-01' }),
-    e({ asset: 'silver', amountCents: 6000, quantityMilli: 2500, date: '2026-11-02' }),
-    e({ asset: 'silver', direction: 'out', amountCents: 2600, quantityMilli: 1000, date: '2026-11-03' }),
-  ];
-  it('nets money per month and up to today', () => {
-    expect(savedInMonth(list, '2026-11')).toBe(10000 - 2500 + 6000 - 2600);
-    expect(savedInMonth(list, '2026-10')).toBe(50000);
-    expect(savedUpTo(list, '2026-11-10')).toBe(50000 + 10000 + 6000 - 2600);
+describe('gold and silver', () => {
+  let n = 0;
+  const e = (o: object) => ({ id: String(n++), asset: 'gold', direction: 'in', amountCents: 50000, quantityMilli: 1000, date: '2026-11-05', createdAt: n, ...o }) as SavingsEntry;
+  it('counts what you hold at the price paid', () => {
+    const m = metals([e({}), e({ amountCents: 70000 }), e({ asset: 'silver', amountCents: 9000, quantityMilli: 3000 })], '2026-12-31');
+    expect(m.gold).toEqual({ quantityMilli: 2000, costCents: 120000 });
+    expect(m.silver).toEqual({ quantityMilli: 3000, costCents: 9000 });
+    expect(m.gainCents).toBe(0);
   });
-  it('counts holdings', () => {
-    const h = holdings(list);
-    expect(h.cash.cents).toBe(7500);
-    expect(h.gold.quantityMilli).toBe(2000);
-    expect(h.silver.quantityMilli).toBe(1500);
-    expect(formatQuantity(h.silver.quantityMilli, 'silver')).toBe('1.5 oz');
+  it('selling uses the average price and records the profit', () => {
+    const list = [e({}), e({ amountCents: 70000 }), e({ direction: 'out', amountCents: 80000, date: '2026-11-20' })];
+    const m = metals(list, '2026-12-31');
+    expect(m.gold).toEqual({ quantityMilli: 1000, costCents: 60000 });
+    expect(m.gainCents).toBe(20000);
+    expect(metals(list, '2026-11-10').gainCents).toBe(0);
+  });
+  it('records a loss, and ignores old cash entries', () => {
+    const m = metals([e({}), e({ direction: 'out', amountCents: 45000, date: '2026-11-06' }), e({ asset: 'cash', amountCents: 999 })], '2026-12-31');
+    expect(m.gold).toEqual({ quantityMilli: 0, costCents: 0 });
+    expect(m.gainCents).toBe(-5000);
+    expect(formatQuantity(1500, 'silver')).toBe('1.5 oz');
     expect(formatQuantity(1000, 'gold')).toBe('1 coin');
   });
   it('reads quantities', () => {

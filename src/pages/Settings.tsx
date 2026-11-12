@@ -147,7 +147,7 @@ export default function Settings() {
 
       <Link to="/money" className="panel link-row">
         <span className="grow"><strong>My money</strong><br />
-          <span className="muted small">Cash, savings, gold and silver, income, starting cash</span>
+          <span className="muted small">Savings, gold and silver, income, starting money</span>
         </span>
         <ChevronRight size={20} aria-hidden />
       </Link>

@@ -196,7 +196,7 @@ export default function Home() {
       <Link to="/money" className="panel link-row">
         <Wallet size={20} aria-hidden />
         <span className="grow"><strong>My money</strong><br />
-          <span className="muted small">Cash, savings, gold and silver, income</span>
+          <span className="muted small">Savings, gold and silver, income</span>
         </span>
         <ChevronRight size={20} aria-hidden />
       </Link>

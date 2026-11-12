@@ -1,35 +1,45 @@
-import { monthOf } from './dates';
-import type { Asset, ISODate, MonthKey, SavingsEntry } from './types';
-
-const signed = (e: SavingsEntry) => (e.direction === 'in' ? e.amountCents : -e.amountCents);
-
-/** Money moved into savings and investments, minus what came back, in one month. */
-export function savedInMonth(entries: SavingsEntry[], month: MonthKey): number {
-  return entries.filter((e) => monthOf(e.date) === month).reduce((s, e) => s + signed(e), 0);
-}
-
-/** The same, for everything dated today or earlier. */
-export function savedUpTo(entries: SavingsEntry[], today: ISODate): number {
-  return entries.filter((e) => e.date <= today).reduce((s, e) => s + signed(e), 0);
-}
+import type { Asset, ISODate, SavingsEntry } from './types';
 
 export interface Holding {
-  /** Cash in savings, or what you've paid for the metal you still hold (net of sales). */
-  cents: number;
   /** Coins or ounces held, in thousandths. */
   quantityMilli: number;
+  /** What you paid for what you still hold. This is the value counted in your savings. */
+  costCents: number;
 }
 
-export function holdings(entries: SavingsEntry[]): Record<Asset, Holding> {
-  const out: Record<Asset, Holding> = {
-    cash: { cents: 0, quantityMilli: 0 },
-    gold: { cents: 0, quantityMilli: 0 },
-    silver: { cents: 0, quantityMilli: 0 },
+export interface Metals {
+  gold: Holding;
+  silver: Holding;
+  /** Profit (or loss) from sales so far: what you received minus what those pieces cost you. */
+  gainCents: number;
+}
+
+/**
+ * Gold and silver held on a date. Buying turns cash into metal, so savings don't change.
+ * Selling uses the average price paid: selling above it adds the profit to your savings.
+ */
+export function metals(entries: SavingsEntry[], upTo: ISODate): Metals {
+  const out: Metals = {
+    gold: { quantityMilli: 0, costCents: 0 },
+    silver: { quantityMilli: 0, costCents: 0 },
+    gainCents: 0,
   };
-  for (const e of entries) {
-    const sign = e.direction === 'in' ? 1 : -1;
-    out[e.asset].cents += sign * e.amountCents;
-    out[e.asset].quantityMilli += sign * (e.quantityMilli ?? 0);
+  const ordered = entries
+    .filter((e) => e.date <= upTo && (e.asset === 'gold' || e.asset === 'silver'))
+    .sort((a, b) => a.date.localeCompare(b.date) || (a.createdAt ?? 0) - (b.createdAt ?? 0));
+  for (const e of ordered) {
+    const h = out[e.asset];
+    const qty = e.quantityMilli ?? 0;
+    if (e.direction === 'in') {
+      h.quantityMilli += qty;
+      h.costCents += e.amountCents;
+    } else {
+      const sold = Math.min(qty, h.quantityMilli);
+      const cost = h.quantityMilli ? Math.round((h.costCents * sold) / h.quantityMilli) : 0;
+      h.quantityMilli -= sold;
+      h.costCents -= cost;
+      out.gainCents += e.amountCents - cost;
+    }
   }
   return out;
 }

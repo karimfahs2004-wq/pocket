@@ -193,7 +193,7 @@ describe('savings storage', () => {
     await db.savings.add({ id: 's1', asset: 'gold', direction: 'in', amountCents: 50000, quantityMilli: 1000, date: '2026-11-01' });
     await setPin('1234');
     const backup = JSON.parse(JSON.stringify(await buildBackup()));
-    expect(backup.version).toBe(3);
+    expect(backup.version).toBe(4);
     expect(backup.data.savings).toHaveLength(1);
     expect(backup.data.settings.pinHash).toBeUndefined();
     expect(JSON.stringify(backup)).not.toContain('1234');
@@ -203,6 +203,30 @@ describe('savings storage', () => {
     expect(await checkPin('1234')).toBe(true);
     await restoreBackup(backup, '2026-11-04', false);
     expect((await getSettings()).pinHash).toBeUndefined();
+  });
+  it('drops manual cash savings from older backups, keeps gold', async () => {
+    const v3 = { app: 'pocket', version: 3, exportedAt: 'x', data: { transactions: [], categories: [], budgets: [], settings: { currency: 'USD', openingBalanceCents: 0 },
+      savings: [
+        { id: 'c', asset: 'cash', direction: 'in', amountCents: 20000, date: '2026-11-01' },
+        { id: 'g', asset: 'gold', direction: 'in', amountCents: 50000, quantityMilli: 1000, date: '2026-11-01' },
+      ] } };
+    await restoreBackup(v3, '2026-11-04');
+    expect((await db.savings.toArray()).map((e) => e.id)).toEqual(['g']);
+  });
+  it('upgrade sets manual cash savings aside', async () => {
+    db.close();
+    await Dexie.delete('pocket');
+    const old = new Dexie('pocket');
+    old.version(3).stores({ transactions: 'id, date, categoryId', categories: 'id', budgets: 'id', settings: 'key', savings: 'id, date, asset' });
+    await old.open();
+    await old.table('savings').bulkAdd([
+      { id: 'c', asset: 'cash', direction: 'in', amountCents: 20000, date: '2026-11-01' },
+      { id: 'g', asset: 'gold', direction: 'in', amountCents: 50000, quantityMilli: 1000, date: '2026-11-01' },
+    ]);
+    old.close();
+    await db.open();
+    expect((await db.savings.toArray()).map((e) => e.id)).toEqual(['g']);
+    expect((await getSettings()).retiredCashSavings).toHaveLength(1);
   });
   it('restores older backups without savings', async () => {
     const v2 = { app: 'pocket', version: 2, exportedAt: 'x', data: { transactions: [], categories: [], budgets: [], settings: { currency: 'USD', openingBalanceCents: 0 } } };

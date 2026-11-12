@@ -4,7 +4,7 @@ import { getSettings, syncSalary, updateSettings } from './repo';
 import { db, newId } from './db';
 
 const APP = 'pocket';
-const VERSION = 3;
+const VERSION = 4;
 
 export async function buildBackup() {
   const exportedAt = new Date().toISOString();
@@ -89,7 +89,8 @@ export async function restoreBackup(raw: unknown, today = todayISO(), keepLock =
     await Promise.all([
       db.transactions.clear(), db.categories.clear(), db.budgets.clear(), db.savings.clear(), db.settings.clear(),
     ]);
-    await db.savings.bulkAdd(data.savings);
+    // Older backups may hold manual cash savings, which no longer exist.
+    await db.savings.bulkAdd(data.savings.filter((e) => (e.asset as string) !== 'cash'));
     await db.transactions.bulkAdd(transactions);
     await db.categories.bulkAdd(data.categories);
     await db.budgets.bulkAdd(data.budgets);

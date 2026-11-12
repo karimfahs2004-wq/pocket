@@ -10,7 +10,7 @@ import { addMonthKey, formatDay, formatMonth, formatMonthShort, monthOf, todayIS
 import { centsToInput, parseAmount } from '../domain/money';
 import { currentBalance, monthTotals, monthlySeries } from '../domain/reports';
 import { nextPayday } from '../domain/salary';
-import { formatQuantity, holdings, savedInMonth, savedUpTo } from '../domain/savings';
+import { formatQuantity, metals } from '../domain/savings';
 
 function StartingSheet({ current, onClose }: { current: number; onClose: () => void }) {
   const { toast } = useUi();
@@ -21,15 +21,15 @@ function StartingSheet({ current, onClose }: { current: number; onClose: () => v
     const cents = parseAmount(value || '0', true);
     if (cents === null) return setError('Enter an amount, like 500 or -50.');
     await updateSettings({ openingBalanceCents: cents });
-    toast({ message: 'Starting cash saved', undo: () => void updateSettings({ openingBalanceCents: current }) });
+    toast({ message: 'Starting money saved', undo: () => void updateSettings({ openingBalanceCents: current }) });
     onClose();
   };
   return (
-    <Sheet title="Starting cash" onClose={onClose}>
+    <Sheet title="Starting money" onClose={onClose}>
       <form className="form" onSubmit={submit} noValidate>
-        <AmountField label="Cash you had before using Pocket" large autoFocus allowNegative value={value} onChange={setValue} error={error} />
-        <p className="hint">Count the money you can spend: wallet and bank. Leave out savings, gold and silver, and add those under Savings & investments.</p>
-        <div className="sheet-actions"><button className="btn primary wide">Save starting cash</button></div>
+        <AmountField label="Money you had before using Pocket" large autoFocus allowNegative value={value} onChange={setValue} error={error} />
+        <p className="hint">Count all the money you had: wallet, bank and savings. Leave out gold and silver, and add those under Gold & silver.</p>
+        <div className="sheet-actions"><button className="btn primary wide">Save starting money</button></div>
       </form>
     </Sheet>
   );
@@ -41,26 +41,26 @@ export default function MyMoney() {
   const [editStart, setEditStart] = useState(false);
   const today = todayISO();
   const month = monthOf(today);
-  const saved = savedUpTo(d.savings, today);
-  const cash = currentBalance(d.transactions, d.settings.openingBalanceCents, today) - saved;
-  const total = cash + saved;
+  // Savings are automatic: everything you received minus everything you spent.
+  // Gold and silver are part of it, counted at the price you paid.
+  const m = metals(d.savings, today);
+  const total = currentBalance(d.transactions, d.settings.openingBalanceCents, today) + m.gainCents;
+  const metal = m.gold.costCents + m.silver.costCents;
+  const cash = total - metal;
   const count = useCountUp(d.ready ? total : 0);
   if (!d.ready) return null;
 
-  const h = holdings(d.savings);
   const holding = [
-    h.cash.cents > 0 && `${d.money(h.cash.cents)} cash savings`,
-    h.gold.quantityMilli > 0 && `${formatQuantity(h.gold.quantityMilli, 'gold')} of gold`,
-    h.silver.quantityMilli > 0 && `${formatQuantity(h.silver.quantityMilli, 'silver')} of silver`,
+    m.gold.quantityMilli > 0 && `${formatQuantity(m.gold.quantityMilli, 'gold')} of gold`,
+    m.silver.quantityMilli > 0 && `${formatQuantity(m.silver.quantityMilli, 'silver')} of silver`,
   ].filter(Boolean).join(', ');
 
   const t = monthTotals(d.transactions, month);
-  const savedNow = savedInMonth(d.savings, month);
-  const left = t.incomeCents - t.expenseCents - savedNow;
+  const savedNow = t.incomeCents - t.expenseCents;
   const salary = d.settings.salary;
   const pay = salary && nextPayday(salary, today);
   const history = monthlySeries(d.transactions, addMonthKey(month, -1), 5).reverse()
-    .filter((x) => x.incomeCents || x.expenseCents || savedInMonth(d.savings, x.month));
+    .filter((x) => x.incomeCents || x.expenseCents);
 
   return (
     <div className="stack">
@@ -68,28 +68,28 @@ export default function MyMoney() {
         <div className="line"><BackButton /><h1>My money</h1></div>
       </header>
 
-      <section className="hero" aria-label="Total money" data-settled={count.settled || undefined}>
-        <p className="hero-label">Total money</p>
+      <section className="hero" aria-label="Total savings" data-settled={count.settled || undefined}>
+        <p className="hero-label">Total savings</p>
         <p className={`hero-value${total < 0 ? ' negative' : ''}`}>{d.money(count.value)}</p>
-        {cash > 0 && saved > 0 && (
-          <div className="money-bar" role="img" aria-label={`${Math.round((cash / total) * 100)}% cash, ${Math.round((saved / total) * 100)}% savings and investments`}>
+        {cash > 0 && metal > 0 && (
+          <div className="money-bar" role="img" aria-label={`${Math.round((cash / total) * 100)}% cash, ${Math.round((metal / total) * 100)}% gold and silver`}>
             <span className="spend" style={{ flexGrow: cash }} />
-            <span className="saved" style={{ flexGrow: saved }} />
+            <span className="saved" style={{ flexGrow: metal }} />
           </div>
         )}
-        <p className="hero-note">Cash plus savings and investments, today.</p>
+        <p className="hero-note">Everything you've received minus everything you've spent. Calculated automatically.</p>
       </section>
 
       <section className="panel rows" aria-label="What you own">
         <div className="money-row">
           <span className="key spend" aria-hidden />
-          <span className="grow">Cash<span className="muted tiny">Money you can spend now</span></span>
+          <span className="grow">Cash<span className="muted tiny">Savings you hold as money</span></span>
           <strong className={`num${cash < 0 ? ' negative-text' : ''}`}>{d.money(cash)}</strong>
         </div>
         <Link to="/savings" className="money-row">
           <span className="key saved" aria-hidden />
-          <span className="grow">Savings & investments<span className="muted tiny">{holding || 'Cash savings, gold coins, silver ounces'}</span></span>
-          <strong className="num">{d.money(saved)}</strong>
+          <span className="grow">Gold & silver<span className="muted tiny">{holding ? `${holding}, at the price you paid` : 'Add gold coins or silver ounces you buy'}</span></span>
+          <strong className="num">{d.money(metal)}</strong>
           <ChevronRight size={16} aria-hidden className="muted" />
         </Link>
       </section>
@@ -99,8 +99,7 @@ export default function MyMoney() {
         <dl className="sum">
           <div><dt>Income received</dt><dd className="num">{d.money(t.incomeCents)}</dd></div>
           <div><dt>Spent</dt><dd className="num">-{d.money(t.expenseCents)}</dd></div>
-          {savedNow !== 0 && <div><dt>{savedNow > 0 ? 'Moved to savings & investments' : 'Taken out of savings'}</dt><dd className="num">{savedNow > 0 ? '-' : '+'}{d.money(Math.abs(savedNow))}</dd></div>}
-          <div className="sum-total"><dt>{left < 0 ? 'Short this month' : 'Left from this month'}</dt><dd className={`num${left < 0 ? ' negative-text' : ''}`}>{d.money(Math.abs(left))}</dd></div>
+          <div className="sum-total"><dt>{savedNow < 0 ? 'Overspent this month' : 'Saved this month'}</dt><dd className={`num${savedNow < 0 ? ' negative-text' : ''}`}>{d.money(Math.abs(savedNow))}</dd></div>
         </dl>
         {salary && pay && monthOf(pay) === month && (
           <p className="muted small">Salary of {d.money(salary.amountCents)} is expected on {formatDay(pay)}. It isn't counted until then.</p>
@@ -113,7 +112,7 @@ export default function MyMoney() {
           <ChevronRight size={16} aria-hidden className="muted" />
         </Link>
         <button className="money-row" onClick={() => { primeKeyboard(); setEditStart(true); }}>
-          <span className="grow">Starting cash<span className="muted tiny">What you had before using Pocket</span></span>
+          <span className="grow">Starting money<span className="muted tiny">What you had before using Pocket</span></span>
           <strong className="num">{d.money(d.settings.openingBalanceCents)}</strong>
           <ChevronRight size={16} aria-hidden className="muted" />
         </button>
@@ -123,10 +122,10 @@ export default function MyMoney() {
         <section className="panel">
           <h2>Earlier months</h2>
           <table>
-            <thead><tr><th>Month</th><th className="r">Income</th><th className="r">Spent</th><th className="r">Left</th></tr></thead>
+            <thead><tr><th>Month</th><th className="r">Income</th><th className="r">Spent</th><th className="r">Saved</th></tr></thead>
             <tbody>
               {history.map((x) => {
-                const l = x.incomeCents - x.expenseCents - savedInMonth(d.savings, x.month);
+                const l = x.incomeCents - x.expenseCents;
                 return (
                   <tr key={x.month}>
                     <td>{formatMonthShort(x.month)}</td>
@@ -138,7 +137,7 @@ export default function MyMoney() {
               })}
             </tbody>
           </table>
-          <p className="muted small">Left is income minus spending and what you moved to savings.</p>
+          <p className="muted small">Saved is income minus spending for that month.</p>
         </section>
       )}
 

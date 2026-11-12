@@ -61,6 +61,15 @@ db.version(2)
 // Version 3 adds savings and investments. Nothing existing changes.
 db.version(3).stores({ savings: 'id, date, asset' });
 
+// Version 4 makes savings automatic (income minus spending). Manual cash-savings entries
+// were only moves between two pockets, so they're set aside; gold and silver stay.
+db.version(4).stores({}).upgrade(async (tx) => {
+  const cash = await tx.table('savings').filter((e) => e.asset === 'cash').toArray();
+  if (!cash.length) return;
+  await tx.table('settings').put({ key: 'retiredCashSavings', value: cash });
+  await tx.table('savings').bulkDelete(cash.map((e) => e.id));
+});
+
 db.on('populate', (tx) => {
   tx.table('categories').bulkAdd(DEFAULT_CATEGORIES);
 });

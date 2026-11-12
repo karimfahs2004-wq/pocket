@@ -33,20 +33,20 @@ export interface Salary {
   lastPaidMonth: MonthKey;
 }
 
-export type Asset = 'cash' | 'gold' | 'silver';
+export type Asset = 'gold' | 'silver';
 
 /**
- * Money set aside or invested. It isn't spending, so budgets and expense reports ignore it,
- * but it does leave your spending money: "in" lowers what's left, "out" adds it back.
+ * A gold or silver purchase or sale. Buying isn't spending: it turns cash into metal, so
+ * your savings stay the same and budgets and expense reports ignore it.
  */
 export interface SavingsEntry {
   id: string;
   asset: Asset;
-  /** in: put into savings or bought. out: taken out or sold. */
+  /** in: bought. out: sold. */
   direction: 'in' | 'out';
-  /** Money moved: amount saved, price paid, or amount received. */
+  /** Price paid, or amount received. */
   amountCents: number;
-  /** Gold coins or silver ounces, in thousandths so 0.5 oz is exact. Cash has none. */
+  /** Gold coins or silver ounces, in thousandths so 0.5 oz is exact. */
   quantityMilli?: number;
   date: ISODate;
   notes?: string;
@@ -66,6 +66,8 @@ export interface Settings {
   openingBalanceCents: number;
   lastBackupAt?: string;
   salary?: Salary;
+  /** Manual cash-savings entries from before savings became automatic, kept for reference. */
+  retiredCashSavings?: unknown[];
   /** The month whose summary was last dismissed. */
   summarySeenFor?: MonthKey;
   /** PIN lock: a salted hash of the PIN, never the PIN. Never included in backups. */
