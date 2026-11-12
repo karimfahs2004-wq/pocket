@@ -1,50 +1,21 @@
 import { ChevronRight, Plus } from 'lucide-react';
-import { useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { AmountField } from '../components/AmountField';
-import { BackButton, Sheet, primeKeyboard, useUi } from '../components/ui';
+import { BackButton, useUi } from '../components/ui';
 import { useCountUp } from '../components/useCountUp';
 import { useAppData } from '../data/hooks';
-import { updateSettings } from '../data/repo';
 import { addMonthKey, formatMonth, formatMonthShort, monthOf, todayISO } from '../domain/dates';
-import { centsToInput, parseAmount } from '../domain/money';
 import { currentBalance, monthTotals, monthlySeries } from '../domain/reports';
 import { formatQuantity, metals } from '../domain/savings';
 
-function StartingSheet({ current, onClose }: { current: number; onClose: () => void }) {
-  const { toast } = useUi();
-  const [value, setValue] = useState(current ? centsToInput(current) : '');
-  const [error, setError] = useState('');
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
-    const cents = parseAmount(value || '0', true);
-    if (cents === null) return setError('Enter an amount, like 500 or -50.');
-    await updateSettings({ openingBalanceCents: cents });
-    toast({ message: 'Starting money saved', undo: () => void updateSettings({ openingBalanceCents: current }) });
-    onClose();
-  };
-  return (
-    <Sheet title="Starting money" onClose={onClose}>
-      <form className="form" onSubmit={submit} noValidate>
-        <AmountField label="Money you had before using Pocket" large autoFocus allowNegative value={value} onChange={setValue} error={error} />
-        <p className="hint">Count all the money you had: wallet, bank and savings. Leave out gold and silver, and add those under Gold & silver.</p>
-        <div className="sheet-actions"><button className="btn primary wide">Save starting money</button></div>
-      </form>
-    </Sheet>
-  );
-}
-
-/** Everything private in one place: what you own, what comes in, and how each month ended. */
 export default function MyMoney() {
   const d = useAppData();
   const { newTransaction } = useUi();
-  const [editStart, setEditStart] = useState(false);
   const today = todayISO();
   const month = monthOf(today);
   // Savings are automatic: everything you received minus everything you spent.
   // Gold and silver are part of it, counted at the price you paid.
   const m = metals(d.savings, today);
-  const total = currentBalance(d.transactions, d.settings.openingBalanceCents, today) + m.gainCents;
+  const total = currentBalance(d.transactions, 0, today) + m.gainCents;
   // Gold and silver are kept as counts only; what you paid for them has left your savings.
   const cash = total - (m.gold.costCents + m.silver.costCents);
   const count = useCountUp(d.ready ? cash : 0);
@@ -96,11 +67,6 @@ export default function MyMoney() {
           <span className="grow">All income<span className="muted tiny">Everything you've received, month by month</span></span>
           <ChevronRight size={16} aria-hidden className="muted" />
         </Link>
-        <button className="money-row" onClick={() => { primeKeyboard(); setEditStart(true); }}>
-          <span className="grow">Starting money<span className="muted tiny">What you had before using Pocket</span></span>
-          <strong className="num">{d.money(d.settings.openingBalanceCents)}</strong>
-          <ChevronRight size={16} aria-hidden className="muted" />
-        </button>
       </section>
 
       {history.length > 0 && (
@@ -126,7 +92,6 @@ export default function MyMoney() {
         </section>
       )}
 
-      {editStart && <StartingSheet current={d.settings.openingBalanceCents} onClose={() => setEditStart(false)} />}
     </div>
   );
 }
